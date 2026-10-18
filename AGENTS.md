@@ -1,13 +1,15 @@
 # PJ Suite
 
-Monorepo. `web/`: React 19 SPA on Vite+ (`vite-plus`, local, npm), Tailwind 4, Radix/shadcn, TanStack Router (file-based, `web/src/routes`, `routeTree.gen.ts` generated). `server/`: Go, Echo v5, SQLite (modernc, pure Go, no cgo). pt-BR UI.
+Monorepo. `web/`: React 19 SPA on Vite+ (`vite-plus`, local), pnpm workspaces, Tailwind 4, Radix/shadcn, TanStack Router (file-based, `web/src/routes`, `routeTree.gen.ts` generated). `server/`: Go, Echo v5, SQLite (modernc, pure Go, no cgo). pt-BR UI.
 
 ## Commands
-All from repo root (npm workspaces `web`, `server`; tasks run via `vp run`).
-- dev: `npm run dev` (web :5173 proxies `/api` to server :8080; env `PJSUITE_ADDR`, `PJSUITE_DB` default `pjsuite.db`)
-- check: `npm run check` (oxfmt + oxlint + gofumpt + go vet); typecheck: `cd web && npx tsc --noEmit`
-- test: `npm run test` (vitest in web, `go test` in server); single Go test: `cd server && go test ./internal/... -run Name`
-- build: `npm run build`
+
+All from repo root (pnpm workspaces `web`, `server`; tasks run via `vp run`; `pnpm install --no-frozen-lockfile` when changing deps locally).
+
+- dev: `pnpm run dev` (web :5173 proxies `/api` to server :8080; env `PJSUITE_ADDR`, `PJSUITE_DB` default `pjsuite.db`)
+- check: `pnpm run check` (oxfmt + oxlint + gofumpt + go vet); typecheck: `cd web && pnpm exec tsc --noEmit`
+- test: `pnpm run test` (vitest in web, `go test` in server); single Go test: `cd server && go test ./internal/... -run Name`
+- build: `pnpm run build`
 
 ## Layout
 
