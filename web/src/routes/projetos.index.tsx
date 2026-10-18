@@ -1,9 +1,24 @@
 import { useEffect, useState } from "react";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ArrowUpRight, Briefcase, Plus, Search } from "lucide-react";
-import { listProjects, type Project } from "@/api";
+import { ArrowUpRight, Briefcase, Copy, MoreHorizontal, Plus, Search } from "lucide-react";
+import {
+  duplicateProject,
+  listClients,
+  listProjects,
+  type Client,
+  type FieldErrors,
+  type Project,
+} from "@/api";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ClientSelect } from "@/project-fields";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge, Banner, Blank, Button, Loading } from "@/ui";
+import { Badge, Banner, Blank, Button, Field, Loading } from "@/ui";
 
 export const Route = createFileRoute("/projetos/")({
   component: ProjectsPage,
@@ -11,7 +26,8 @@ export const Route = createFileRoute("/projetos/")({
 });
 
 function ProjectsPage() {
-  const created = !!Route.useSearch().criado;
+  const [created, setCreated] = useState(!!Route.useSearch().criado);
+  const [toDuplicate, setToDuplicate] = useState<Project>();
   const navigate = useNavigate();
   const [active, setActive] = useState<Project[]>();
   const [archived, setArchived] = useState<Project[]>([]);
@@ -92,6 +108,25 @@ function ProjectsPage() {
                       <span className="project-icon">
                         <Briefcase size={22} />
                       </span>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" aria-label={`Ações de ${p.name}`}>
+                            <MoreHorizontal />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          <DropdownMenuItem
+                            onClick={() =>
+                              navigate({ to: "/projetos/$id", params: { id: String(p.id) } })
+                            }
+                          >
+                            Editar projeto
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setToDuplicate(p)}>
+                            Duplicar projeto
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                     <small>{p.area}</small>
                     <Link
@@ -146,7 +181,79 @@ function ProjectsPage() {
             )}
           </>
         )}
+        {toDuplicate && (
+          <DuplicateDialog
+            key={toDuplicate.id}
+            source={toDuplicate}
+            onClose={() => setToDuplicate(undefined)}
+            onCreated={(project) => {
+              setActive((list) => [project, ...(list ?? [])]);
+              setTab("active");
+              setCreated(true);
+              setToDuplicate(undefined);
+            }}
+          />
+        )}
       </main>
     </div>
+  );
+}
+
+function DuplicateDialog({
+  source,
+  onClose,
+  onCreated,
+}: {
+  source: Project;
+  onClose: () => void;
+  onCreated: (project: Project) => void;
+}) {
+  const navigate = useNavigate();
+  const [name, setName] = useState(`${source.name} — cópia`);
+  const [clientId, setClientId] = useState(source.clientId);
+  const [clients, setClients] = useState<Pick<Client, "id" | "name">[]>([]);
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [pending, setPending] = useState(false);
+
+  useEffect(() => {
+    listClients().then((outcome) => {
+      if (outcome.kind === "unauthorized") return navigate({ to: "/entrar" });
+      if (outcome.kind !== "ok") return;
+      setClients(outcome.value);
+      if (!outcome.value.some((c) => c.id === source.clientId)) {
+        setClientId(outcome.value[0]?.id ?? source.clientId);
+      }
+    });
+  }, [navigate, source.clientId]);
+
+  async function submit() {
+    setPending(true);
+    const outcome = await duplicateProject(source.id, { name, clientId });
+    setPending(false);
+    if (outcome.kind === "unauthorized") return navigate({ to: "/entrar" });
+    if (outcome.kind === "ok") return onCreated(outcome.value);
+    setErrors(outcome.kind === "invalid" ? outcome.errors : { name: "Não foi possível duplicar." });
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogTitle>Um novo começo, com a mesma base.</DialogTitle>
+        <DialogDescription>
+          Copie escopo, etapas e condições. Assinatura, link e histórico não serão copiados.
+        </DialogDescription>
+        <Field label="Nome do novo projeto" value={name} onChange={setName} error={errors.name} />
+        <ClientSelect
+          value={clientId}
+          clients={clients}
+          error={errors.client}
+          onChange={setClientId}
+        />
+        <Button onClick={submit} disabled={pending}>
+          {pending ? "Duplicando…" : "Duplicar como rascunho"}
+          <Copy />
+        </Button>
+      </DialogContent>
+    </Dialog>
   );
 }

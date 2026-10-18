@@ -151,3 +151,8 @@ export const getProject = (id: string) =>
 
 export const updateProject = (id: string, input: Omit<ProjectInput, "structure">) =>
   call(`/api/projects/${encodeURIComponent(id)}`, json("PUT", input), none);
+
+export const duplicateProject = (id: number, input: { name: string; clientId: number }) =>
+  call(`/api/projects/${id}/duplicate`, json("POST", input), async (res) =>
+    projectSchema.parse(await res.json()),
+  );

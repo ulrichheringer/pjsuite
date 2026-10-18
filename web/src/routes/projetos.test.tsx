@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vite-plus/test";
 import { jsonResponse, mockFetch, renderAt } from "@/test-utils";
@@ -211,4 +211,54 @@ test("an archived project opens read-only", async () => {
   expect(await screen.findByText("Projeto arquivado.")).toBeInTheDocument();
   expect(screen.getByLabelText(/Nome do projeto/)).toBeDisabled();
   expect(screen.queryByRole("button", { name: "Salvar alterações" })).not.toBeInTheDocument();
+});
+
+const openMenu = (name: string, item: string) =>
+  userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: `Ações de ${name}` }))
+    .then(() => userEvent.setup().click(screen.getByRole("menuitem", { name: item })));
+
+test("duplicating posts the default name and shows the new card", async () => {
+  const copy = project(10, "Ensaio de marca — cópia", "Ana Lima");
+  const fetchSpy = mockFetch((path, init) => {
+    if (path === "/api/clients") return jsonResponse(200, clientList);
+    if (path === "/api/projects/1/duplicate") return jsonResponse(201, copy);
+    return listing(path);
+  });
+  renderAt("/projetos");
+  await screen.findByText("Ensaio de marca");
+  await openMenu("Ensaio de marca", "Duplicar projeto");
+
+  const dialog = await screen.findByRole("dialog");
+  expect(within(dialog).getByLabelText("Nome do novo projeto")).toHaveValue("Ensaio de marca — cópia");
+  await within(dialog).findByRole("option", { name: "Bruno Costa" });
+  await userEvent.setup().click(within(dialog).getByRole("button", { name: /Duplicar como rascunho/ }));
+
+  expect(await screen.findByText("Projeto criado.")).toBeInTheDocument();
+  expect(screen.getByText("Ensaio de marca — cópia")).toBeInTheDocument();
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  const post = fetchSpy.mock.calls.find(([path]) => path === "/api/projects/1/duplicate")!;
+  expect(JSON.parse(String(post[1]?.body))).toEqual({ name: "Ensaio de marca — cópia", clientId: 1 });
+});
+
+test("duplicating lets the name and client be changed", async () => {
+  const fetchSpy = mockFetch((path) => {
+    if (path === "/api/clients") return jsonResponse(200, clientList);
+    if (path === "/api/projects/1/duplicate") return jsonResponse(201, project(10, "Outro", "Bruno Costa"));
+    return listing(path);
+  });
+  renderAt("/projetos");
+  await screen.findByText("Ensaio de marca");
+  await openMenu("Ensaio de marca", "Duplicar projeto");
+  const dialog = await screen.findByRole("dialog");
+  await within(dialog).findByRole("option", { name: "Bruno Costa" });
+  const user = userEvent.setup();
+  await user.clear(within(dialog).getByLabelText("Nome do novo projeto"));
+  await user.type(within(dialog).getByLabelText("Nome do novo projeto"), "Outro");
+  await user.selectOptions(within(dialog).getByLabelText("Cliente"), "Bruno Costa");
+  await user.click(within(dialog).getByRole("button", { name: /Duplicar como rascunho/ }));
+  await screen.findByText("Projeto criado.");
+  const post = fetchSpy.mock.calls.find(([path]) => path === "/api/projects/1/duplicate")!;
+  expect(JSON.parse(String(post[1]?.body))).toEqual({ name: "Outro", clientId: 2 });
 });

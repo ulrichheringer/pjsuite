@@ -3,6 +3,8 @@ import { areas, type Client, type FieldErrors, type ProjectInput } from "@/api";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Choice, Field } from "@/ui";
 
+type ClientOption = Pick<Client, "id" | "name">;
+
 export const emptyProject: ProjectInput = {
   clientId: 0,
   name: "",
@@ -12,7 +14,11 @@ export const emptyProject: ProjectInput = {
   structure: "essential",
 };
 
-const structures: { value: ProjectInput["structure"]; name: string; copy: (area: string) => string }[] = [
+const structures: {
+  value: ProjectInput["structure"];
+  name: string;
+  copy: (area: string) => string;
+}[] = [
   { value: "blank", name: "Em branco", copy: () => "Você adiciona cada etapa do seu jeito." },
   { value: "essential", name: "Essencial", copy: () => "Briefing, execução, revisão e entrega." },
   {
@@ -21,6 +27,41 @@ const structures: { value: ProjectInput["structure"]; name: string; copy: (area:
     copy: (area) => `Uma base adaptada para ${area.toLowerCase()}.`,
   },
 ];
+
+export function ClientSelect({
+  value,
+  clients,
+  error,
+  disabled = false,
+  onChange,
+}: {
+  value: number;
+  clients: ClientOption[];
+  error?: string;
+  disabled?: boolean;
+  onChange: (id: number) => void;
+}) {
+  const id = useId();
+  return (
+    <div className="field">
+      <label htmlFor={id}>Cliente</label>
+      <NativeSelect
+        id={id}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        aria-invalid={!!error}
+        disabled={disabled}
+      >
+        {clients.map((c) => (
+          <NativeSelectOption key={c.id} value={c.id}>
+            {c.name}
+          </NativeSelectOption>
+        ))}
+      </NativeSelect>
+      {error && <span className="field-error">{error}</span>}
+    </div>
+  );
+}
 
 export function ProjectFields({
   value,
@@ -32,14 +73,15 @@ export function ProjectFields({
 }: {
   value: ProjectInput;
   errors: FieldErrors;
-  clients: Pick<Client, "id" | "name">[];
+  clients: ClientOption[];
   chooseStructure?: boolean;
   disabled?: boolean;
   onChange: (value: ProjectInput) => void;
 }) {
-  const clientId = useId();
-  const set = <K extends keyof ProjectInput>(key: K) => (next: ProjectInput[K]) =>
-    onChange({ ...value, [key]: next });
+  const set =
+    <K extends keyof ProjectInput>(key: K) =>
+    (next: ProjectInput[K]) =>
+      onChange({ ...value, [key]: next });
   return (
     <>
       <div className="two-col">
@@ -51,24 +93,19 @@ export function ProjectFields({
           disabled={disabled}
           required
         />
-        <div className="field">
-          <label htmlFor={clientId}>Cliente</label>
-          <NativeSelect
-            id={clientId}
-            value={value.clientId}
-            onChange={(e) => set("clientId")(Number(e.target.value))}
-            aria-invalid={!!errors.client}
-            disabled={disabled}
-          >
-            {clients.map((c) => (
-              <NativeSelectOption key={c.id} value={c.id}>
-                {c.name}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-          {errors.client && <span className="field-error">{errors.client}</span>}
-        </div>
-        <Choice label="Área do trabalho" options={areas} value={value.area} onChange={set("area")} />
+        <ClientSelect
+          value={value.clientId}
+          clients={clients}
+          error={errors.client}
+          disabled={disabled}
+          onChange={set("clientId")}
+        />
+        <Choice
+          label="Área do trabalho"
+          options={areas}
+          value={value.area}
+          onChange={set("area")}
+        />
         <Field
           label="Referência interna (opcional)"
           placeholder="Ex.: PJ-2026-024"
