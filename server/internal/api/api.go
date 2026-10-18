@@ -34,5 +34,7 @@ func New(db *sql.DB) *echo.Echo {
 	g.PUT("/profile", s.putProfile, s.requireAuth, bodyLimit)
 	g.PUT("/profile/avatar", s.putAvatar, s.requireAuth)
 	g.GET("/profile/avatar", s.getAvatar, s.requireAuth)
+	g.GET("/clients", s.listClients, s.requireAuth)
+	g.POST("/clients", s.createClient, s.requireAuth, bodyLimit)
 	return e
 }
