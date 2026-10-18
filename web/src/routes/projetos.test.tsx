@@ -220,14 +220,15 @@ test("an archived project opens read-only", async () => {
   renderAt("/projetos/5");
   expect(await screen.findByText("Projeto arquivado.")).toBeInTheDocument();
   expect(screen.getByLabelText(/Nome do projeto/)).toBeDisabled();
+  expect(screen.getByLabelText("Área do trabalho")).toBeDisabled();
   expect(screen.queryByRole("button", { name: "Salvar alterações" })).not.toBeInTheDocument();
 });
 
-const openMenu = (name: string, item: string) =>
-  userEvent
-    .setup()
-    .click(screen.getByRole("button", { name: `Ações de ${name}` }))
-    .then(() => userEvent.setup().click(screen.getByRole("menuitem", { name: item })));
+async function openMenu(name: string, item: string) {
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: `Ações de ${name}` }));
+  await user.click(screen.getByRole("menuitem", { name: item }));
+}
 
 test("duplicating posts the default name and shows the new card", async () => {
   const copy = project(10, "Ensaio de marca — cópia", "Ana Lima");

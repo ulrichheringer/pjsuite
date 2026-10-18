@@ -212,7 +212,10 @@ func (s *server) duplicateProject(c *echo.Context) error {
 		p.ClientID = src.ClientID
 	}
 	if p.Name == "" {
-		p.Name = src.Name + " — cópia"
+		const suffix = " — cópia"
+		base := []rune(src.Name)
+		base = base[:min(len(base), maxProjectNameRunes-utf8.RuneCountInString(suffix))]
+		p.Name = string(base) + suffix
 	}
 	errs, err := s.checkProject(c, p, 0)
 	if err != nil {

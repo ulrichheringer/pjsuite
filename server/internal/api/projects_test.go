@@ -225,3 +225,14 @@ func TestProjectsDuplicateRejectsBadClient(t *testing.T) {
 		t.Fatalf("other user duplicate = %d", rec.Code)
 	}
 }
+
+func TestProjectsDuplicateKeepsDefaultNameWithinLimit(t *testing.T) {
+	e := newServer(t)
+	a := signedUp(t, e)
+	path := createdProject(t, e, a, map[string]any{"name": strings.Repeat("a", 120), "clientId": clientID(t, e, a, "Ana")})
+
+	rec := send(e, http.MethodPost, path+"/duplicate", nil, a)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("duplicate = %d %s", rec.Code, rec.Body)
+	}
+}

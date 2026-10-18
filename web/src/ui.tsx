@@ -97,17 +97,24 @@ export function Choice({
   options,
   value,
   onChange,
+  disabled = false,
 }: {
   label: string;
   options: string[];
   value?: string;
   onChange?: (v: string) => void;
+  disabled?: boolean;
 }) {
   const id = useId();
   return (
     <div className="field">
       <label htmlFor={id}>{label}</label>
-      <Select value={value} defaultValue={value ? undefined : options[0]} onValueChange={onChange}>
+      <Select
+        value={value}
+        defaultValue={value ? undefined : options[0]}
+        onValueChange={onChange}
+        disabled={disabled}
+      >
         <SelectTrigger id={id}>
           <SelectValue />
         </SelectTrigger>

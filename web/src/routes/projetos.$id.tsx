@@ -32,9 +32,9 @@ function EditProjectPage() {
         return navigate({ to: "/entrar" });
       }
       if (current.kind !== "ok" || active.kind !== "ok") return setFailed(true);
-      const { clientId, clientName, ...input } = current.value;
+      const { clientId, clientName, name, area, reference, goal, structure } = current.value;
       setProject(current.value);
-      setForm({ clientId, ...input });
+      setForm({ clientId, name, area, reference, goal, structure });
       setClients(
         active.value.some((c) => c.id === clientId)
           ? active.value

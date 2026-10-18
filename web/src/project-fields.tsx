@@ -105,6 +105,7 @@ export function ProjectFields({
           options={areas}
           value={value.area}
           onChange={set("area")}
+          disabled={disabled}
         />
         <Field
           label="Referência interna (opcional)"
