@@ -74,3 +74,21 @@ export const saveProfile = (input: ProfileInput) => call("/api/profile", json("P
 
 export const uploadAvatar = (file: File) =>
   call("/api/profile/avatar", { method: "PUT", body: file }, none);
+
+export const clientSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  email: z.string(),
+  phone: z.string(),
+  company: z.string(),
+  notes: z.string(),
+  stage: z.enum(["recent", "proposal", "active"]),
+  archived: z.boolean(),
+});
+
+export type Client = z.infer<typeof clientSchema>;
+
+export const listClients = (archived = false) =>
+  call(`/api/clients${archived ? "?archived=1" : ""}`, {}, async (res) =>
+    z.array(clientSchema).parse(await res.json()),
+  );
