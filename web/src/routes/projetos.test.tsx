@@ -156,3 +156,59 @@ test("new project form shows server field errors and stays", async () => {
   ).toBeInTheDocument();
   expect(router.state.location.pathname).toBe("/projetos/novo");
 });
+
+const editing = project(5, "Ensaio de marca", "Bruno Costa", {
+  clientId: 2,
+  area: "Design",
+  reference: "PJ-7",
+  goal: "Identidade visual",
+  structure: "suggested",
+});
+
+const editRoutes = (extra?: Parameters<typeof mockFetch>[0]) =>
+  mockFetch((path, init) => {
+    if (path === "/api/clients") return jsonResponse(200, clientList);
+    if (path === "/api/projects/5" && !init?.method) return jsonResponse(200, editing);
+    return extra?.(path, init) ?? jsonResponse(200, []);
+  });
+
+test("edit form is prefilled, shows the version note and hides the structure", async () => {
+  editRoutes();
+  renderAt("/projetos/5");
+  expect(await screen.findByLabelText(/Nome do projeto/)).toHaveValue("Ensaio de marca");
+  await vi.waitFor(() => expect(screen.getByLabelText("Cliente")).toHaveValue("2"));
+  expect(screen.getByLabelText(/Referência interna/)).toHaveValue("PJ-7");
+  expect(screen.getByLabelText("Objetivo do projeto")).toHaveValue("Identidade visual");
+  expect(screen.getByText("Alterações comerciais geram uma nova versão.")).toBeInTheDocument();
+  expect(screen.queryByText("Como você quer começar a montagem?")).not.toBeInTheDocument();
+});
+
+test("edit form saves the changes without the structure", async () => {
+  const fetchSpy = editRoutes((_, init) => (init?.method === "PUT" ? jsonResponse(204) : undefined));
+  renderAt("/projetos/5");
+  const user = userEvent.setup();
+  const name = await screen.findByLabelText(/Nome do projeto/);
+  await vi.waitFor(() => expect(screen.getByLabelText("Cliente")).toHaveValue("2"));
+  await user.clear(name);
+  await user.type(name, "Marca nova");
+  await user.selectOptions(screen.getByLabelText("Cliente"), "Ana Lima");
+  await user.click(screen.getByRole("button", { name: "Salvar alterações" }));
+  expect(await screen.findByText("Projeto salvo.")).toBeInTheDocument();
+  const put = fetchSpy.mock.calls.find(([, init]) => init?.method === "PUT")!;
+  expect(put[0]).toBe("/api/projects/5");
+  const body = JSON.parse(String(put[1]?.body));
+  expect(body).toMatchObject({ name: "Marca nova", clientId: 1, area: "Design", reference: "PJ-7" });
+  expect(body).not.toHaveProperty("structure");
+});
+
+test("an archived project opens read-only", async () => {
+  mockFetch((path) =>
+    path === "/api/projects/5"
+      ? jsonResponse(200, { ...editing, archived: true })
+      : jsonResponse(200, clientList),
+  );
+  renderAt("/projetos/5");
+  expect(await screen.findByText("Projeto arquivado.")).toBeInTheDocument();
+  expect(screen.getByLabelText(/Nome do projeto/)).toBeDisabled();
+  expect(screen.queryByRole("button", { name: "Salvar alterações" })).not.toBeInTheDocument();
+});

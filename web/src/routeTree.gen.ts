@@ -17,6 +17,7 @@ import { Route as ClientesIndexRouteImport } from './routes/clientes.index'
 import { Route as ClientesIdRouteImport } from './routes/clientes.$id'
 import { Route as ClientesNovoRouteImport } from './routes/clientes.novo'
 import { Route as ProjetosIndexRouteImport } from './routes/projetos.index'
+import { Route as ProjetosIdRouteImport } from './routes/projetos.$id'
 import { Route as ProjetosNovoRouteImport } from './routes/projetos.novo'
 
 const IndexRoute = IndexRouteImport.update({
@@ -59,6 +60,11 @@ const ProjetosIndexRoute = ProjetosIndexRouteImport.update({
   path: '/projetos/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProjetosIdRoute = ProjetosIdRouteImport.update({
+  id: '/projetos/$id',
+  path: '/projetos/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProjetosNovoRoute = ProjetosNovoRouteImport.update({
   id: '/projetos/novo',
   path: '/projetos/novo',
@@ -72,6 +78,7 @@ export interface FileRoutesByFullPath {
   '/perfil': typeof PerfilRoute
   '/clientes/$id': typeof ClientesIdRoute
   '/clientes/novo': typeof ClientesNovoRoute
+  '/projetos/$id': typeof ProjetosIdRoute
   '/projetos/novo': typeof ProjetosNovoRoute
   '/clientes/': typeof ClientesIndexRoute
   '/projetos/': typeof ProjetosIndexRoute
@@ -83,6 +90,7 @@ export interface FileRoutesByTo {
   '/perfil': typeof PerfilRoute
   '/clientes/$id': typeof ClientesIdRoute
   '/clientes/novo': typeof ClientesNovoRoute
+  '/projetos/$id': typeof ProjetosIdRoute
   '/projetos/novo': typeof ProjetosNovoRoute
   '/clientes': typeof ClientesIndexRoute
   '/projetos': typeof ProjetosIndexRoute
@@ -95,6 +103,7 @@ export interface FileRoutesById {
   '/perfil': typeof PerfilRoute
   '/clientes/$id': typeof ClientesIdRoute
   '/clientes/novo': typeof ClientesNovoRoute
+  '/projetos/$id': typeof ProjetosIdRoute
   '/projetos/novo': typeof ProjetosNovoRoute
   '/clientes/': typeof ClientesIndexRoute
   '/projetos/': typeof ProjetosIndexRoute
@@ -108,6 +117,7 @@ export interface FileRouteTypes {
     | '/perfil'
     | '/clientes/$id'
     | '/clientes/novo'
+    | '/projetos/$id'
     | '/projetos/novo'
     | '/clientes/'
     | '/projetos/'
@@ -119,6 +129,7 @@ export interface FileRouteTypes {
     | '/perfil'
     | '/clientes/$id'
     | '/clientes/novo'
+    | '/projetos/$id'
     | '/projetos/novo'
     | '/clientes'
     | '/projetos'
@@ -130,6 +141,7 @@ export interface FileRouteTypes {
     | '/perfil'
     | '/clientes/$id'
     | '/clientes/novo'
+    | '/projetos/$id'
     | '/projetos/novo'
     | '/clientes/'
     | '/projetos/'
@@ -142,6 +154,7 @@ export interface RootRouteChildren {
   PerfilRoute: typeof PerfilRoute
   ClientesIdRoute: typeof ClientesIdRoute
   ClientesNovoRoute: typeof ClientesNovoRoute
+  ProjetosIdRoute: typeof ProjetosIdRoute
   ProjetosNovoRoute: typeof ProjetosNovoRoute
   ClientesIndexRoute: typeof ClientesIndexRoute
   ProjetosIndexRoute: typeof ProjetosIndexRoute
@@ -205,6 +218,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjetosIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/projetos/$id': {
+      id: '/projetos/$id'
+      path: '/projetos/$id'
+      fullPath: '/projetos/$id'
+      preLoaderRoute: typeof ProjetosIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/projetos/novo': {
       id: '/projetos/novo'
       path: '/projetos/novo'
@@ -222,6 +242,7 @@ const rootRouteChildren: RootRouteChildren = {
   PerfilRoute: PerfilRoute,
   ClientesIdRoute: ClientesIdRoute,
   ClientesNovoRoute: ClientesNovoRoute,
+  ProjetosIdRoute: ProjetosIdRoute,
   ProjetosNovoRoute: ProjetosNovoRoute,
   ClientesIndexRoute: ClientesIndexRoute,
   ProjetosIndexRoute: ProjetosIndexRoute,

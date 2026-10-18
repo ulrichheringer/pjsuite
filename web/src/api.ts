@@ -143,3 +143,11 @@ export type ProjectInput = Pick<
 
 export const createProject = (input: ProjectInput) =>
   call("/api/projects", json("POST", input), async (res) => projectSchema.parse(await res.json()));
+
+export const getProject = (id: string) =>
+  call(`/api/projects/${encodeURIComponent(id)}`, {}, async (res) =>
+    projectSchema.parse(await res.json()),
+  );
+
+export const updateProject = (id: string, input: Omit<ProjectInput, "structure">) =>
+  call(`/api/projects/${encodeURIComponent(id)}`, json("PUT", input), none);
