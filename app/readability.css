@@ -1,0 +1,138 @@
+/* Minimum readable sizes across the product; metadata never substitutes a label. */
+.product p {
+  font-size: 16px;
+  line-height: 1.7;
+}
+.product small,
+.product .small,
+.product .eyebrow,
+.product .workspace-label,
+.product .workspace-label span,
+.product .file-row small,
+.product .phase-list small,
+.product .project-summary small,
+.product .timeline p,
+.product .pro-footer,
+.product .pro-footer small,
+.product .client-footer small,
+.product .client-footer > span:not(.logo),
+.product .auth-form .prototype-note,
+.product .auth-form .auth-switch,
+.product .client-header > span:not(.logo),
+.product .client-byline,
+.product .contract-paper footer {
+  font-size: 12px !important;
+}
+.product .field label,
+.product .field-label,
+.product .check-label,
+.product .checklist label,
+.product .switch-row strong,
+.product .file-row strong,
+.product .project-summary strong,
+.product .person strong,
+.product .client-table td,
+.product .client-table th,
+.product .share-status,
+.product .timeline strong,
+.product .notifications strong,
+.product .phase-list strong,
+.product .stepper,
+.product .pro-topbar nav,
+.product .back-link,
+.product .project-card footer,
+.product .project-card footer strong {
+  font-size: 14px;
+}
+.product .search-field input {
+  font-size: 14px;
+}
+.product .sidebar-bottom-note p {
+  font-size: 21px !important;
+}
+.product .contract-paper > p {
+  font-size: 14px;
+}
+.product .contract-parties p {
+  font-size: 12px !important;
+}
+.product .client-byline {
+  gap: 10px;
+}
+.product .client-byline > span > strong {
+  font-size: 14px;
+}
+.product .client-decision p {
+  font-size: 14px;
+}
+.product .upload-box > span {
+  font-size: 12px;
+}
+.product .sign-form > p {
+  font-size: 14px;
+}
+.product .prototype-note {
+  line-height: 1.6;
+}
+.screen-rail button,
+.screen-rail button > span,
+.screen-rail h3,
+.screen-rail > .eyebrow,
+.catalog-title > span,
+.catalog-footnote,
+.viewport-label,
+.screen-spec .eyebrow,
+.device-toggle button,
+.state-select .field label {
+  font-size: 12px;
+}
+.board .eyebrow,
+.board .swatch code,
+.board .swatch small,
+.board .composition-caption,
+.board .brand-signature > span:last-child,
+.board .logo-pair small,
+.board .type-board small {
+  font-size: 12px;
+}
+.catalog-toggle {
+  min-width: 44px;
+}
+.screen-workspace.mobile {
+  max-width: 450px;
+}
+@media (max-width: 767px) {
+  .product .auth-form form {
+    margin-top: 24px;
+  }
+  .product .client-project-intro h1 {
+    font-size: 36px;
+  }
+  .product .client-byline > span:last-child {
+    margin-left: 0;
+  }
+  .product .stepper {
+    font-size: 12px;
+  }
+  .board .logo-pair {
+    grid-template-columns: 1fr;
+  }
+  .board .swatches {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .product .client-table td:nth-child(2) {
+    font-size: 14px;
+  }
+  .product .client-table td:nth-child(3) {
+    font-size: 12px;
+  }
+}
+@media print {
+  .product .contract-paper > p {
+    font-size: 10pt;
+  }
+  .product .contract-paper small,
+  .product .contract-paper footer {
+    font-size: 8pt !important;
+  }
+}
