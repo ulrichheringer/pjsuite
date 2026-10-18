@@ -102,3 +102,6 @@ export const getClient = (id: string) =>
 
 export const updateClient = (id: string, input: ClientInput) =>
   call(`/api/clients/${id}`, json("PUT", input), none);
+
+export const moveClient = (id: number, stage: Client["stage"]) =>
+  call(`/api/clients/${id}/stage`, json("PUT", { stage }), none);

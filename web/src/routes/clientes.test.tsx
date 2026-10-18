@@ -163,3 +163,32 @@ test("leaving without changes does not ask", async () => {
   await vi.waitFor(() => expect(router.state.location.pathname).toBe("/clientes"));
   expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
 });
+
+test("Mover advances the client to the next column", async () => {
+  const fetchSpy = mockFetch((_, init) =>
+    init?.method === "PUT" ? jsonResponse(204) : jsonResponse(200, clients),
+  );
+  renderAt("/clientes");
+  const recent = await screen.findByRole("region", { name: "Contato recente" });
+  await userEvent.click(within(recent).getByRole("button", { name: /Mover para proposta/ }));
+  const proposal = screen.getByRole("region", { name: "Proposta enviada" });
+  await within(proposal).findByText("Ana Lima");
+  expect(within(recent).queryByText("Ana Lima")).not.toBeInTheDocument();
+  const put = fetchSpy.mock.calls.find(([, init]) => init?.method === "PUT")!;
+  expect(put[0]).toBe("/api/clients/1/stage");
+  expect(JSON.parse(String(put[1]?.body))).toEqual({ stage: "proposal" });
+  expect(
+    within(screen.getByRole("region", { name: "Projeto ativo" })).queryByRole("button", {
+      name: /Mover/,
+    }),
+  ).not.toBeInTheDocument();
+});
+
+test("a failed move keeps the card and shows an error", async () => {
+  mockFetch((_, init) => (init?.method === "PUT" ? jsonResponse(500) : jsonResponse(200, clients)));
+  renderAt("/clientes");
+  const recent = await screen.findByRole("region", { name: "Contato recente" });
+  await userEvent.click(within(recent).getByRole("button", { name: /Mover para proposta/ }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Não foi possível mover");
+  expect(within(recent).getByText("Ana Lima")).toBeInTheDocument();
+});

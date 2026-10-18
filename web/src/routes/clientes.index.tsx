@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Plus, Search } from "lucide-react";
-import { listClients, type Client } from "@/api";
+import { ArrowRight, Plus, Search } from "lucide-react";
+import { listClients, moveClient, type Client } from "@/api";
 import { Avatar, Banner, Blank, Button, Loading } from "@/ui";
 
 export const Route = createFileRoute("/clientes/")({ component: ClientsPage });
@@ -16,6 +16,7 @@ function ClientsPage() {
   const navigate = useNavigate();
   const [clients, setClients] = useState<Client[]>();
   const [failed, setFailed] = useState(false);
+  const [moveFailed, setMoveFailed] = useState(false);
   const [query, setQuery] = useState("");
 
   useEffect(() => {
@@ -25,6 +26,15 @@ function ClientsPage() {
       setClients(outcome.value);
     });
   }, [navigate]);
+
+  async function move(client: Client, stage: Client["stage"]) {
+    const outcome = await moveClient(client.id, stage);
+    if (outcome.kind === "unauthorized") return navigate({ to: "/entrar" });
+    setMoveFailed(outcome.kind !== "ok");
+    if (outcome.kind === "ok") {
+      setClients(clients?.map((c) => (c.id === client.id ? { ...c, stage } : c)));
+    }
+  }
 
   const needle = query.trim().toLowerCase();
   const visible = (clients ?? []).filter((c) =>
@@ -62,6 +72,11 @@ function ClientsPage() {
           />
         ) : (
           <>
+            {moveFailed && (
+              <Banner title="Não foi possível mover o cliente." tone="danger">
+                Ele continua na etapa anterior. Tente novamente.
+              </Banner>
+            )}
             <div className="list-toolbar">
               <div className="search-field">
                 <Search size={18} />
@@ -74,7 +89,8 @@ function ClientsPage() {
               </div>
             </div>
             <div className="client-board">
-              {stages.map((stage) => {
+              {stages.map((stage, index) => {
+                const next = stages[index + 1];
                 const inStage = visible.filter((c) => c.stage === stage.value);
                 return (
                   <section className="client-column" key={stage.value} aria-label={stage.label}>
@@ -97,6 +113,16 @@ function ClientsPage() {
                               </div>
                             </div>
                           </div>
+                          {next && (
+                            <Button
+                              variant="ghost"
+                              className="advance-client"
+                              onClick={() => move(c, next.value)}
+                            >
+                              Mover para {next.label.toLowerCase()}
+                              <ArrowRight size={15} />
+                            </Button>
+                          )}
                         </article>
                       ))}
                       {!inStage.length && (
