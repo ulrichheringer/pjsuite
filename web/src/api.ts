@@ -113,3 +113,23 @@ export const archiveClient = (id: number) =>
 
 export const restoreClient = (id: number) =>
   call(`/api/clients/${id}/restore`, { method: "POST" }, none);
+
+const projectSchema = z.object({
+  id: z.number(),
+  clientId: z.number(),
+  clientName: z.string(),
+  name: z.string(),
+  area: z.string(),
+  reference: z.string(),
+  goal: z.string(),
+  structure: z.enum(["blank", "essential", "suggested"]),
+  status: z.literal("draft"),
+  archived: z.boolean(),
+});
+
+export type Project = z.infer<typeof projectSchema>;
+
+export const listProjects = (archived = false) =>
+  call(`/api/projects${archived ? "?archived=1" : ""}`, {}, async (res) =>
+    z.array(projectSchema).parse(await res.json()),
+  );
