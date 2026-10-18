@@ -29,7 +29,11 @@ function EditClientPage() {
   const [pending, setPending] = useState(false);
 
   const dirty = JSON.stringify(form) !== JSON.stringify(saved);
-  const blocker = useBlocker({ shouldBlockFn: () => dirty, withResolver: true });
+  const blocker = useBlocker({
+    shouldBlockFn: () => dirty,
+    enableBeforeUnload: () => dirty,
+    withResolver: true,
+  });
 
   useEffect(() => {
     getClient(id).then((outcome) => {

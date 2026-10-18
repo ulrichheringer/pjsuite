@@ -75,7 +75,7 @@ export const saveProfile = (input: ProfileInput) => call("/api/profile", json("P
 export const uploadAvatar = (file: File) =>
   call("/api/profile/avatar", { method: "PUT", body: file }, none);
 
-export const clientSchema = z.object({
+const clientSchema = z.object({
   id: z.number(),
   name: z.string(),
   email: z.string(),
@@ -98,10 +98,12 @@ export type ClientInput = Pick<Client, "name" | "email" | "phone" | "company" | 
 export const createClient = (input: ClientInput) => call("/api/clients", json("POST", input), none);
 
 export const getClient = (id: string) =>
-  call(`/api/clients/${id}`, {}, async (res) => clientSchema.parse(await res.json()));
+  call(`/api/clients/${encodeURIComponent(id)}`, {}, async (res) =>
+    clientSchema.parse(await res.json()),
+  );
 
 export const updateClient = (id: string, input: ClientInput) =>
-  call(`/api/clients/${id}`, json("PUT", input), none);
+  call(`/api/clients/${encodeURIComponent(id)}`, json("PUT", input), none);
 
 export const moveClient = (id: number, stage: Client["stage"]) =>
   call(`/api/clients/${id}/stage`, json("PUT", { stage }), none);

@@ -71,7 +71,7 @@ function ClientsPage() {
     run(
       "Não foi possível mover o cliente.",
       () => moveClient(client.id, stage),
-      () => setActive(active?.map((c) => (c.id === client.id ? { ...c, stage } : c))),
+      () => setActive((list) => list?.map((c) => (c.id === client.id ? { ...c, stage } : c))),
     );
 
   const archive = (client: Client) =>
@@ -79,8 +79,8 @@ function ClientsPage() {
       "Não foi possível arquivar o cliente.",
       () => archiveClient(client.id),
       () => {
-        setActive(active?.filter((c) => c.id !== client.id));
-        setArchived([{ ...client, archived: true }, ...archived].sort(byName));
+        setActive((list) => list?.filter((c) => c.id !== client.id));
+        setArchived((list) => [{ ...client, archived: true }, ...list].sort(byName));
         toast.success(`${client.name} arquivado.`);
       },
     );
@@ -90,8 +90,8 @@ function ClientsPage() {
       "Não foi possível restaurar o cliente.",
       () => restoreClient(client.id),
       () => {
-        setArchived(archived.filter((c) => c.id !== client.id));
-        setActive([...(active ?? []), { ...client, archived: false }].sort(byName));
+        setArchived((list) => list.filter((c) => c.id !== client.id));
+        setActive((list) => [...(list ?? []), { ...client, archived: false }].sort(byName));
         toast.success(`${client.name} restaurado.`);
       },
     );
@@ -139,7 +139,10 @@ function ClientsPage() {
               </Banner>
             )}
             <div className="list-toolbar">
-              <Tabs value={tab} onValueChange={(value) => setTab(value as typeof tab)}>
+              <Tabs
+                value={tab}
+                onValueChange={(value) => setTab(value === "archived" ? "archived" : "active")}
+              >
                 <TabsList variant="line">
                   <TabsTrigger value="active">
                     Ativos <span className="tab-count">{active.length}</span>
@@ -252,8 +255,14 @@ function ClientsPage() {
               </div>
             ) : (
               <Blank
-                title="Nenhum cliente arquivado."
-                description="Clientes arquivados aparecem aqui e podem ser restaurados."
+                title={
+                  archived.length ? "Nenhum resultado para a busca." : "Nenhum cliente arquivado."
+                }
+                description={
+                  archived.length
+                    ? "Tente outro nome, e-mail ou empresa."
+                    : "Clientes arquivados aparecem aqui e podem ser restaurados."
+                }
               />
             )}
           </>

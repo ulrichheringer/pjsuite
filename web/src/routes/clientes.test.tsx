@@ -247,6 +247,16 @@ test("Restaurar brings an archived client back to its stage", async () => {
   ).toBeInTheDocument();
 });
 
+test("a search with no match on the archived tab says so", async () => {
+  board([client(2, "Bruno Costa", "proposal", { archived: true })]);
+  renderAt("/clientes");
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("tab", { name: /Arquivados/ }));
+  await user.type(screen.getByLabelText("Buscar cliente"), "zzz");
+  expect(await screen.findByText("Nenhum resultado para a busca.")).toBeInTheDocument();
+  expect(screen.queryByText("Nenhum cliente arquivado.")).not.toBeInTheDocument();
+});
+
 test("an archived client opens read-only", async () => {
   mockFetch(() => jsonResponse(200, { ...ana, archived: true }));
   renderAt("/clientes/1");
