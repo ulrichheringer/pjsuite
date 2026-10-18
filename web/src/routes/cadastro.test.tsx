@@ -15,7 +15,7 @@ async function fillAndSubmit(user: ReturnType<typeof userEvent.setup>, accept = 
 
 test("signup success posts the form and goes to /perfil", async () => {
   const fetchSpy = mockFetch((path) =>
-    path === "/api/signup" ? jsonResponse(201) : jsonResponse(401, { errors: {} }),
+    path === "/api/signup" ? jsonResponse(201) : new Promise<Response>(() => {}),
   );
   const router = renderAt("/cadastro");
   const user = userEvent.setup();
@@ -38,7 +38,9 @@ test("duplicate email shows inline error", async () => {
 });
 
 test("validation errors from the server show inline", async () => {
-  mockFetch(() => jsonResponse(400, { errors: { acceptTerms: "Aceite os termos para continuar." } }));
+  mockFetch(() =>
+    jsonResponse(400, { errors: { acceptTerms: "Aceite os termos para continuar." } }),
+  );
   renderAt("/cadastro");
   await fillAndSubmit(userEvent.setup(), false);
   expect(await screen.findByText("Aceite os termos para continuar.")).toBeInTheDocument();

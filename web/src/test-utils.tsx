@@ -12,7 +12,9 @@ export function renderAt(path: string) {
   return router;
 }
 
-export function mockFetch(handler: (path: string, init?: RequestInit) => Response | Promise<Response>) {
+export function mockFetch(
+  handler: (path: string, init?: RequestInit) => Response | Promise<Response>,
+) {
   const spy = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
     handler(String(input), init),
   );

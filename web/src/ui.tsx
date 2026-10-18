@@ -211,7 +211,11 @@ export function Avatar({
   return (
     <span className={`avatar ${size}`} aria-label={name}>
       {src ? (
-        <img src={src} alt="" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }} />
+        <img
+          src={src}
+          alt=""
+          style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }}
+        />
       ) : (
         name
           .split(" ")
