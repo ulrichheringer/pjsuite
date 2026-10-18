@@ -5,9 +5,13 @@ import { listProjects, type Project } from "@/api";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge, Banner, Blank, Button, Loading } from "@/ui";
 
-export const Route = createFileRoute("/projetos/")({ component: ProjectsPage });
+export const Route = createFileRoute("/projetos/")({
+  component: ProjectsPage,
+  validateSearch: (search): { criado?: true } => (search.criado ? { criado: true } : {}),
+});
 
 function ProjectsPage() {
+  const created = !!Route.useSearch().criado;
   const navigate = useNavigate();
   const [active, setActive] = useState<Project[]>();
   const [archived, setArchived] = useState<Project[]>([]);
@@ -47,6 +51,7 @@ function ProjectsPage() {
             </Link>
           </Button>
         </header>
+        {created && <Banner title="Projeto criado." tone="success" />}
         {failed ? (
           <Banner title="Não foi possível carregar os projetos." tone="danger">
             Tente novamente em instantes.

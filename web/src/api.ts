@@ -8,6 +8,8 @@ export type Outcome<T = undefined> =
   | { kind: "unauthorized" }
   | { kind: "failed"; status: number };
 
+export const areas = ["Fotografia", "Design", "Produção", "Outros serviços criativos"];
+
 export const profileSchema = z.object({
   name: z.string(),
   businessName: z.string(),
@@ -133,3 +135,11 @@ export const listProjects = (archived = false) =>
   call(`/api/projects${archived ? "?archived=1" : ""}`, {}, async (res) =>
     z.array(projectSchema).parse(await res.json()),
   );
+
+export type ProjectInput = Pick<
+  Project,
+  "clientId" | "name" | "area" | "reference" | "goal" | "structure"
+>;
+
+export const createProject = (input: ProjectInput) =>
+  call("/api/projects", json("POST", input), async (res) => projectSchema.parse(await res.json()));
