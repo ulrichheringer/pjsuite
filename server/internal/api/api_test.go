@@ -191,3 +191,76 @@ func TestLogin(t *testing.T) {
 		t.Fatalf("login failures differ: %q vs %q", messages[0], messages[1])
 	}
 }
+
+func send(e *echo.Echo, method, path string, body any, cookie *http.Cookie) *httptest.ResponseRecorder {
+	buf, _ := json.Marshal(body)
+	req := httptest.NewRequest(method, path, bytes.NewReader(buf))
+	req.Header.Set("Content-Type", "application/json")
+	if cookie != nil {
+		req.AddCookie(cookie)
+	}
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	return rec
+}
+
+func TestProfileRequiresAuth(t *testing.T) {
+	e := newServer(t)
+	if rec := get(e, "/api/profile"); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("GET = %d", rec.Code)
+	}
+	if rec := send(e, http.MethodPut, "/api/profile", map[string]any{}, nil); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("PUT = %d", rec.Code)
+	}
+}
+
+func TestProfileIsPrefilledAtSignup(t *testing.T) {
+	e := newServer(t)
+	rec := get(e, "/api/profile", signedUp(t, e))
+	var got map[string]string
+	json.Unmarshal(rec.Body.Bytes(), &got)
+	if got["name"] != "Helena Duarte" || got["contactEmail"] != "helena@example.com" {
+		t.Fatalf("profile = %s", rec.Body)
+	}
+}
+
+func TestProfileUpdateRoundTrips(t *testing.T) {
+	e := newServer(t)
+	cookie := signedUp(t, e)
+	want := map[string]string{
+		"name": "Helena D.", "businessName": "Helena Duarte Fotografia", "contactEmail": "contato@example.com",
+		"phone": "(31) 99900-0124", "area": "Fotografia", "city": "Belo Horizonte, MG", "bio": "Fotografia afetiva.",
+	}
+	if rec := send(e, http.MethodPut, "/api/profile", want, cookie); rec.Code != http.StatusNoContent {
+		t.Fatalf("PUT = %d %s", rec.Code, rec.Body)
+	}
+	var got map[string]any
+	json.Unmarshal(get(e, "/api/profile", cookie).Body.Bytes(), &got)
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("%s = %v, want %v", k, got[k], v)
+		}
+	}
+}
+
+func TestProfileUpdateValidation(t *testing.T) {
+	tests := []struct {
+		name, field string
+		mutate      func(map[string]string)
+	}{
+		{"invalid area", "area", func(b map[string]string) { b["area"] = "Culinária" }},
+		{"missing name", "name", func(b map[string]string) { b["name"] = "" }},
+		{"missing contact email", "contactEmail", func(b map[string]string) { b["contactEmail"] = "sem-arroba" }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := newServer(t)
+			body := map[string]string{"name": "H", "contactEmail": "h@example.com", "area": "Design"}
+			tt.mutate(body)
+			rec := send(e, http.MethodPut, "/api/profile", body, signedUp(t, e))
+			if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), tt.field) {
+				t.Fatalf("PUT = %d %s", rec.Code, rec.Body)
+			}
+		})
+	}
+}

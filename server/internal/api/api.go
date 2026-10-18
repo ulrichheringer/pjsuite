@@ -27,5 +27,7 @@ func New(db *sql.DB) *echo.Echo {
 	g.POST("/login", s.login)
 	g.POST("/logout", s.logout)
 	g.GET("/me", s.me, s.requireAuth)
+	g.GET("/profile", s.getProfile, s.requireAuth)
+	g.PUT("/profile", s.putProfile, s.requireAuth)
 	return e
 }
