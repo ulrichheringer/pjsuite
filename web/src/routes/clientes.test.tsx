@@ -109,3 +109,57 @@ test("board links to the new client form", async () => {
   await userEvent.click(await screen.findByRole("link", { name: /Novo cliente/ }));
   await vi.waitFor(() => expect(router.state.location.pathname).toBe("/clientes/novo"));
 });
+
+const ana = client(1, "Ana Lima", "recent", {
+  phone: "(31) 90000-0000",
+  notes: "Prefere WhatsApp.",
+});
+
+test("edit form is prefilled with the client", async () => {
+  mockFetch(() => jsonResponse(200, ana));
+  renderAt("/clientes/1");
+  expect(await screen.findByLabelText(/Nome/)).toHaveValue("Ana Lima");
+  expect(screen.getByLabelText("E-mail")).toHaveValue("ana@example.com");
+  expect(screen.getByLabelText("Observações internas")).toHaveValue("Prefere WhatsApp.");
+});
+
+test("edit form saves changes and confirms", async () => {
+  const fetchSpy = mockFetch((_, init) =>
+    init?.method === "PUT" ? jsonResponse(204) : jsonResponse(200, ana),
+  );
+  renderAt("/clientes/1");
+  const user = userEvent.setup();
+  const name = await screen.findByLabelText(/Nome/);
+  await user.clear(name);
+  await user.type(name, "Ana Souza");
+  await user.click(screen.getByRole("button", { name: /Salvar alterações/ }));
+  expect(await screen.findByText("Cliente salvo.")).toBeInTheDocument();
+  const put = fetchSpy.mock.calls.find(([, init]) => init?.method === "PUT")!;
+  expect(put[0]).toBe("/api/clients/1");
+  expect(JSON.parse(String(put[1]?.body))).toMatchObject({
+    name: "Ana Souza",
+    phone: "(31) 90000-0000",
+  });
+});
+
+test("leaving with unsaved changes asks for confirmation", async () => {
+  mockFetch(() => jsonResponse(200, ana));
+  const router = renderAt("/clientes/1");
+  const user = userEvent.setup();
+  await user.type(await screen.findByLabelText("Telefone"), "9");
+  await user.click(screen.getByRole("link", { name: /Voltar para clientes/ }));
+  expect(await screen.findByRole("alertdialog")).toHaveTextContent("Sair sem salvar?");
+  await user.click(screen.getByRole("button", { name: "Continuar editando" }));
+  expect(router.state.location.pathname).toBe("/clientes/1");
+  await user.click(screen.getByRole("link", { name: /Voltar para clientes/ }));
+  await user.click(await screen.findByRole("button", { name: "Sair sem salvar" }));
+  await vi.waitFor(() => expect(router.state.location.pathname).toBe("/clientes"));
+});
+
+test("leaving without changes does not ask", async () => {
+  mockFetch(() => jsonResponse(200, ana));
+  const router = renderAt("/clientes/1");
+  await userEvent.click(await screen.findByRole("link", { name: /Voltar para clientes/ }));
+  await vi.waitFor(() => expect(router.state.location.pathname).toBe("/clientes"));
+  expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+});

@@ -96,3 +96,9 @@ export const listClients = (archived = false) =>
 export type ClientInput = Pick<Client, "name" | "email" | "phone" | "company" | "notes">;
 
 export const createClient = (input: ClientInput) => call("/api/clients", json("POST", input), none);
+
+export const getClient = (id: string) =>
+  call(`/api/clients/${id}`, {}, async (res) => clientSchema.parse(await res.json()));
+
+export const updateClient = (id: string, input: ClientInput) =>
+  call(`/api/clients/${id}`, json("PUT", input), none);
