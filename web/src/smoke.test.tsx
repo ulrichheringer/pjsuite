@@ -1,3 +1,4 @@
+import { expect, test } from "vite-plus/test";
 import { render, screen } from "@testing-library/react";
 import { Banner } from "@/ui";
 
