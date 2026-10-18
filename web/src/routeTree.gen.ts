@@ -14,6 +14,7 @@ import { Route as CadastroRouteImport } from './routes/cadastro'
 import { Route as EntrarRouteImport } from './routes/entrar'
 import { Route as PerfilRouteImport } from './routes/perfil'
 import { Route as ClientesIndexRouteImport } from './routes/clientes.index'
+import { Route as ClientesNovoRouteImport } from './routes/clientes.novo'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -40,12 +41,18 @@ const ClientesIndexRoute = ClientesIndexRouteImport.update({
   path: '/clientes/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ClientesNovoRoute = ClientesNovoRouteImport.update({
+  id: '/clientes/novo',
+  path: '/clientes/novo',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/cadastro': typeof CadastroRoute
   '/entrar': typeof EntrarRoute
   '/perfil': typeof PerfilRoute
+  '/clientes/novo': typeof ClientesNovoRoute
   '/clientes/': typeof ClientesIndexRoute
 }
 export interface FileRoutesByTo {
@@ -53,6 +60,7 @@ export interface FileRoutesByTo {
   '/cadastro': typeof CadastroRoute
   '/entrar': typeof EntrarRoute
   '/perfil': typeof PerfilRoute
+  '/clientes/novo': typeof ClientesNovoRoute
   '/clientes': typeof ClientesIndexRoute
 }
 export interface FileRoutesById {
@@ -61,14 +69,23 @@ export interface FileRoutesById {
   '/cadastro': typeof CadastroRoute
   '/entrar': typeof EntrarRoute
   '/perfil': typeof PerfilRoute
+  '/clientes/novo': typeof ClientesNovoRoute
   '/clientes/': typeof ClientesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/cadastro' | '/entrar' | '/perfil' | '/clientes/'
+  fullPaths:
+    '/' | '/cadastro' | '/entrar' | '/perfil' | '/clientes/novo' | '/clientes/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/cadastro' | '/entrar' | '/perfil' | '/clientes'
-  id: '__root__' | '/' | '/cadastro' | '/entrar' | '/perfil' | '/clientes/'
+  to: '/' | '/cadastro' | '/entrar' | '/perfil' | '/clientes/novo' | '/clientes'
+  id:
+    | '__root__'
+    | '/'
+    | '/cadastro'
+    | '/entrar'
+    | '/perfil'
+    | '/clientes/novo'
+    | '/clientes/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -76,6 +93,7 @@ export interface RootRouteChildren {
   CadastroRoute: typeof CadastroRoute
   EntrarRoute: typeof EntrarRoute
   PerfilRoute: typeof PerfilRoute
+  ClientesNovoRoute: typeof ClientesNovoRoute
   ClientesIndexRoute: typeof ClientesIndexRoute
 }
 
@@ -116,6 +134,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ClientesIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/clientes/novo': {
+      id: '/clientes/novo'
+      path: '/clientes/novo'
+      fullPath: '/clientes/novo'
+      preLoaderRoute: typeof ClientesNovoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -124,6 +149,7 @@ const rootRouteChildren: RootRouteChildren = {
   CadastroRoute: CadastroRoute,
   EntrarRoute: EntrarRoute,
   PerfilRoute: PerfilRoute,
+  ClientesNovoRoute: ClientesNovoRoute,
   ClientesIndexRoute: ClientesIndexRoute,
 }
 export const routeTree = rootRouteImport

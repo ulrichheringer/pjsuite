@@ -70,3 +70,42 @@ test("redirects to /entrar on 401", async () => {
   const router = renderAt("/clientes");
   await vi.waitFor(() => expect(router.state.location.pathname).toBe("/entrar"));
 });
+
+test("new client form posts the data and returns to the board", async () => {
+  const fetchSpy = mockFetch((_, init) =>
+    init?.method === "POST"
+      ? jsonResponse(201, client(9, "Dora Reis", "recent"))
+      : jsonResponse(200, []),
+  );
+  const router = renderAt("/clientes/novo");
+  const user = userEvent.setup();
+  await user.type(await screen.findByLabelText(/Nome/), "Dora Reis");
+  await user.type(screen.getByLabelText("E-mail"), "dora@example.com");
+  await user.type(screen.getByLabelText("Observações internas"), "Indicação da Ana.");
+  await user.click(screen.getByRole("button", { name: /Criar cliente/ }));
+  await vi.waitFor(() => expect(router.state.location.pathname).toBe("/clientes"));
+  const post = fetchSpy.mock.calls.find(([, init]) => init?.method === "POST")!;
+  expect(post[0]).toBe("/api/clients");
+  expect(JSON.parse(String(post[1]?.body))).toMatchObject({
+    name: "Dora Reis",
+    email: "dora@example.com",
+    notes: "Indicação da Ana.",
+  });
+});
+
+test("new client form shows server field errors and stays", async () => {
+  mockFetch(() => jsonResponse(400, { errors: { email: "Confira o e-mail." } }));
+  const router = renderAt("/clientes/novo");
+  const user = userEvent.setup();
+  await user.type(await screen.findByLabelText(/Nome/), "Dora");
+  await user.click(screen.getByRole("button", { name: /Criar cliente/ }));
+  expect(await screen.findByText("Confira o e-mail.")).toBeInTheDocument();
+  expect(router.state.location.pathname).toBe("/clientes/novo");
+});
+
+test("board links to the new client form", async () => {
+  mockFetch(() => jsonResponse(200, clients));
+  const router = renderAt("/clientes");
+  await userEvent.click(await screen.findByRole("link", { name: /Novo cliente/ }));
+  await vi.waitFor(() => expect(router.state.location.pathname).toBe("/clientes/novo"));
+});

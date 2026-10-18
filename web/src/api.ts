@@ -92,3 +92,7 @@ export const listClients = (archived = false) =>
   call(`/api/clients${archived ? "?archived=1" : ""}`, {}, async (res) =>
     z.array(clientSchema).parse(await res.json()),
   );
+
+export type ClientInput = Pick<Client, "name" | "email" | "phone" | "company" | "notes">;
+
+export const createClient = (input: ClientInput) => call("/api/clients", json("POST", input), none);

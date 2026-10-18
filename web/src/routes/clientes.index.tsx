@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Search } from "lucide-react";
+import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Plus, Search } from "lucide-react";
 import { listClients, type Client } from "@/api";
-import { Avatar, Banner, Blank, Loading } from "@/ui";
+import { Avatar, Banner, Blank, Button, Loading } from "@/ui";
 
 export const Route = createFileRoute("/clientes/")({ component: ClientsPage });
 
@@ -40,6 +40,12 @@ function ClientsPage() {
             <h1>Clientes</h1>
             <p>Boas relações começam com os detalhes certos.</p>
           </div>
+          <Button asChild>
+            <Link to="/clientes/novo">
+              <Plus />
+              Novo cliente
+            </Link>
+          </Button>
         </header>
         {failed ? (
           <Banner title="Não foi possível carregar os clientes." tone="danger">
@@ -51,6 +57,8 @@ function ClientsPage() {
           <Blank
             title="Nenhum cliente ainda."
             description="Cadastre o primeiro cliente para começar."
+            action="Novo cliente"
+            onClick={() => navigate({ to: "/clientes/novo" })}
           />
         ) : (
           <>
