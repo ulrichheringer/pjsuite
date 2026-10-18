@@ -192,3 +192,65 @@ test("a failed move keeps the card and shows an error", async () => {
   expect(await screen.findByRole("alert")).toHaveTextContent("Não foi possível mover");
   expect(within(recent).getByText("Ana Lima")).toBeInTheDocument();
 });
+
+const board = (archived: { id: number }[] = []) =>
+  mockFetch((path, init) => {
+    if (init?.method === "POST") return jsonResponse(204);
+    if (path.endsWith("archived=1")) return jsonResponse(200, archived);
+    return jsonResponse(
+      200,
+      clients.filter((c) => !archived.some((a) => a.id === c.id)),
+    );
+  });
+
+test("archiving asks for confirmation, then lists the client under Arquivados", async () => {
+  const fetchSpy = board();
+  renderAt("/clientes");
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "Ações de Ana Lima" }));
+  await user.click(await screen.findByRole("menuitem", { name: "Arquivar cliente" }));
+  expect(await screen.findByRole("alertdialog")).toHaveTextContent("Arquivar Ana Lima?");
+  await user.click(screen.getByRole("button", { name: "Cancelar" }));
+  expect(fetchSpy.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
+
+  await user.click(screen.getByRole("button", { name: "Ações de Ana Lima" }));
+  await user.click(await screen.findByRole("menuitem", { name: "Arquivar cliente" }));
+  await user.click(await screen.findByRole("button", { name: "Arquivar" }));
+  expect(await screen.findByText("Ana Lima arquivado.")).toBeInTheDocument();
+  expect(
+    fetchSpy.mock.calls.some(([p, i]) => p === "/api/clients/1/archive" && i?.method === "POST"),
+  ).toBe(true);
+  expect(screen.queryByRole("region", { name: "Contato recente" })).toHaveTextContent(
+    "Nenhum cliente nesta etapa.",
+  );
+
+  await user.click(screen.getByRole("tab", { name: /Arquivados/ }));
+  expect(await screen.findByText("Ana Lima")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Restaurar" })).toBeInTheDocument();
+});
+
+test("Restaurar brings an archived client back to its stage", async () => {
+  const fetchSpy = board([client(2, "Bruno Costa", "proposal", { archived: true })]);
+  renderAt("/clientes");
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("tab", { name: /Arquivados/ }));
+  await user.click(await screen.findByRole("button", { name: "Restaurar" }));
+  expect(await screen.findByText("Bruno Costa restaurado.")).toBeInTheDocument();
+  expect(
+    fetchSpy.mock.calls.some(([p, i]) => p === "/api/clients/2/restore" && i?.method === "POST"),
+  ).toBe(true);
+  await user.click(screen.getByRole("tab", { name: /Ativos/ }));
+  expect(
+    within(await screen.findByRole("region", { name: "Proposta enviada" })).getByText(
+      "Bruno Costa",
+    ),
+  ).toBeInTheDocument();
+});
+
+test("an archived client opens read-only", async () => {
+  mockFetch(() => jsonResponse(200, { ...ana, archived: true }));
+  renderAt("/clientes/1");
+  expect(await screen.findByLabelText(/Nome/)).toBeDisabled();
+  expect(screen.getByRole("status")).toHaveTextContent("Cliente arquivado");
+  expect(screen.queryByRole("button", { name: /Salvar alterações/ })).not.toBeInTheDocument();
+});

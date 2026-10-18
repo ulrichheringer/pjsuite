@@ -105,3 +105,9 @@ export const updateClient = (id: string, input: ClientInput) =>
 
 export const moveClient = (id: number, stage: Client["stage"]) =>
   call(`/api/clients/${id}/stage`, json("PUT", { stage }), none);
+
+export const archiveClient = (id: number) =>
+  call(`/api/clients/${id}/archive`, { method: "POST" }, none);
+
+export const restoreClient = (id: number) =>
+  call(`/api/clients/${id}/restore`, { method: "POST" }, none);

@@ -24,6 +24,7 @@ function EditClientPage() {
   const [form, setForm] = useState<ClientInput>();
   const [errors, setErrors] = useState<FieldErrors>({});
   const [failed, setFailed] = useState(false);
+  const [archived, setArchived] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [pending, setPending] = useState(false);
 
@@ -36,6 +37,7 @@ function EditClientPage() {
       if (outcome.kind !== "ok") return setFailed(true);
       const { name, email, phone, company, notes } = outcome.value;
       const input = { name, email, phone, company, notes };
+      setArchived(outcome.value.archived);
       setSaved(input);
       setForm(input);
     });
@@ -91,21 +93,29 @@ function EditClientPage() {
             Seus dados foram mantidos. Confira os campos e tente novamente.
           </Banner>
         )}
+        {archived && (
+          <Banner title="Cliente arquivado." tone="info">
+            Restaure o cliente na aba Arquivados para editar.
+          </Banner>
+        )}
         {confirmed && !dirty && <Banner title="Cliente salvo." tone="success" />}
         <form className="form-surface" onSubmit={submit} noValidate>
           <ClientFields
             value={form}
             errors={errors}
+            disabled={archived}
             onChange={(next) => {
               setConfirmed(false);
               setForm(next);
             }}
           />
-          <div className="form-actions">
-            <Button type="submit" disabled={pending}>
-              {pending ? "Salvando…" : "Salvar alterações"}
-            </Button>
-          </div>
+          {!archived && (
+            <div className="form-actions">
+              <Button type="submit" disabled={pending}>
+                {pending ? "Salvando…" : "Salvar alterações"}
+              </Button>
+            </div>
+          )}
         </form>
         <AlertDialog open={blocker.status === "blocked"}>
           <AlertDialogContent>

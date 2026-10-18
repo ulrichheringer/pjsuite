@@ -6,10 +6,12 @@ export const emptyClient: ClientInput = { name: "", email: "", phone: "", compan
 export function ClientFields({
   value,
   errors,
+  disabled = false,
   onChange,
 }: {
   value: ClientInput;
   errors: FieldErrors;
+  disabled?: boolean;
   onChange: (value: ClientInput) => void;
 }) {
   const set = (key: keyof ClientInput) => (next: string) => onChange({ ...value, [key]: next });
@@ -21,6 +23,7 @@ export function ClientFields({
           value={value.name}
           onChange={set("name")}
           error={errors.name}
+          disabled={disabled}
           required
         />
         <Field
@@ -29,11 +32,23 @@ export function ClientFields({
           value={value.email}
           onChange={set("email")}
           error={errors.email}
+          disabled={disabled}
         />
-        <Field label="Telefone" value={value.phone} onChange={set("phone")} />
-        <Field label="Empresa" value={value.company} onChange={set("company")} />
+        <Field label="Telefone" value={value.phone} onChange={set("phone")} disabled={disabled} />
+        <Field
+          label="Empresa"
+          value={value.company}
+          onChange={set("company")}
+          disabled={disabled}
+        />
       </div>
-      <Field label="Observações internas" value={value.notes} onChange={set("notes")} area />
+      <Field
+        label="Observações internas"
+        value={value.notes}
+        onChange={set("notes")}
+        disabled={disabled}
+        area
+      />
     </>
   );
 }
