@@ -78,6 +78,9 @@ func TestClientsCreateAndListOwnOnly(t *testing.T) {
 func createdClient(t *testing.T, e *echo.Echo, cookie *http.Cookie, name string) string {
 	t.Helper()
 	rec := send(e, http.MethodPost, "/api/clients", map[string]any{"name": name}, cookie)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create = %d %s", rec.Code, rec.Body)
+	}
 	var got struct{ ID int }
 	decode(t, rec, &got)
 	return "/api/clients/" + strconv.Itoa(got.ID)
@@ -151,7 +154,9 @@ func TestClientsArchiveAndRestore(t *testing.T) {
 	cookie := signedUp(t, e)
 	b := signedUpAs(t, e, "bruno@example.com")
 	path := createdClient(t, e, cookie, "Ana")
-	send(e, http.MethodPut, path+"/stage", map[string]any{"stage": "active"}, cookie)
+	if rec := send(e, http.MethodPut, path+"/stage", map[string]any{"stage": "active"}, cookie); rec.Code != http.StatusNoContent {
+		t.Fatalf("stage = %d", rec.Code)
+	}
 
 	if rec := send(e, http.MethodPost, path+"/archive", nil, b); rec.Code != http.StatusNotFound {
 		t.Fatalf("other user archive = %d", rec.Code)
@@ -166,8 +171,9 @@ func TestClientsArchiveAndRestore(t *testing.T) {
 		t.Fatalf("archived list = %v", got)
 	}
 
-	if rec := send(e, http.MethodPut, path, map[string]any{"name": "Novo"}, cookie); rec.Code != http.StatusConflict {
-		t.Fatalf("PUT archived = %d", rec.Code)
+	rec := send(e, http.MethodPut, path, map[string]any{"name": "Novo"}, cookie)
+	if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), `"errors":{"archived"`) {
+		t.Fatalf("PUT archived = %d %s", rec.Code, rec.Body)
 	}
 	if rec := send(e, http.MethodPut, path+"/stage", map[string]any{"stage": "recent"}, cookie); rec.Code != http.StatusConflict {
 		t.Fatalf("stage archived = %d", rec.Code)

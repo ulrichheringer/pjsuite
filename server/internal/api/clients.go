@@ -107,12 +107,8 @@ func (s *server) findClient(c *echo.Context) (client, error) {
 	return cl, err
 }
 
-func (s *server) findActiveClient(c *echo.Context) (client, error) {
-	cl, err := s.findClient(c)
-	if err == nil && cl.Archived {
-		return cl, echo.NewHTTPError(http.StatusConflict, "Cliente arquivado.")
-	}
-	return cl, err
+func archivedConflict(c *echo.Context) error {
+	return invalid(c, http.StatusConflict, fieldErrors{"archived": "Cliente arquivado."})
 }
 
 func (s *server) getClient(c *echo.Context) error {
@@ -124,9 +120,12 @@ func (s *server) getClient(c *echo.Context) error {
 }
 
 func (s *server) putClient(c *echo.Context) error {
-	cl, err := s.findActiveClient(c)
+	cl, err := s.findClient(c)
 	if err != nil {
 		return err
+	}
+	if cl.Archived {
+		return archivedConflict(c)
 	}
 	id := cl.ID
 	cl = client{}
@@ -146,9 +145,12 @@ func (s *server) putClient(c *echo.Context) error {
 }
 
 func (s *server) putClientStage(c *echo.Context) error {
-	cl, err := s.findActiveClient(c)
+	cl, err := s.findClient(c)
 	if err != nil {
 		return err
+	}
+	if cl.Archived {
+		return archivedConflict(c)
 	}
 	var req struct {
 		Stage string `json:"stage"`
@@ -166,19 +168,19 @@ func (s *server) putClientStage(c *echo.Context) error {
 }
 
 func (s *server) archiveClient(c *echo.Context) error {
-	return s.setArchived(c, `COALESCE(archived_at, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`)
+	return s.execOwned(c, `UPDATE clients SET archived_at = COALESCE(archived_at, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) WHERE id = ?`)
 }
 
 func (s *server) restoreClient(c *echo.Context) error {
-	return s.setArchived(c, `NULL`)
+	return s.execOwned(c, `UPDATE clients SET archived_at = NULL WHERE id = ?`)
 }
 
-func (s *server) setArchived(c *echo.Context, value string) error {
+func (s *server) execOwned(c *echo.Context, query string) error {
 	cl, err := s.findClient(c)
 	if err != nil {
 		return err
 	}
-	if _, err := s.db.ExecContext(c.Request().Context(), `UPDATE clients SET archived_at = `+value+` WHERE id = ?`, cl.ID); err != nil {
+	if _, err := s.db.ExecContext(c.Request().Context(), query, cl.ID); err != nil {
 		return err
 	}
 	return c.NoContent(http.StatusNoContent)
