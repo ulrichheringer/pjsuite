@@ -30,6 +30,10 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	if err := store.Migrate(ctx, db); err != nil {
+		return err
+	}
+
 	sc := echo.StartConfig{Address: env("PJSUITE_ADDR", ":8080")}
 	return sc.Start(ctx, api.New(db))
 }

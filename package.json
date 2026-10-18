@@ -1,0 +1,26 @@
+{
+  "name": "pjsuite",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "web",
+    "server"
+  ],
+  "type": "module",
+  "scripts": {
+    "dev": "vp run -r --parallel dev",
+    "check": "vp check && vp run -r check:go",
+    "test": "vp run -r test",
+    "build": "vp run -r build"
+  },
+  "devDependencies": {
+    "vite-plus": "^1.3.0"
+  },
+  "overrides": {
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.3.0",
+    "vitest": "5.0.5"
+  },
+  "engines": {
+    "node": "^22.18.0 || ^24.11.0 || >=26.0.0"
+  }
+}

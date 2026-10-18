@@ -1,10 +1,14 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
+	"github.com/pressly/goose/v3"
 	_ "modernc.org/sqlite"
+
+	"github.com/ulrichheringer/pjsuite/server/migrations"
 )
 
 func Open(path string) (*sql.DB, error) {
@@ -22,4 +26,15 @@ func Open(path string) (*sql.DB, error) {
 		return nil, fmt.Errorf("ping sqlite: %w", err)
 	}
 	return db, nil
+}
+
+func Migrate(ctx context.Context, db *sql.DB) error {
+	goose.SetBaseFS(migrations.FS)
+	if err := goose.SetDialect("sqlite3"); err != nil {
+		return fmt.Errorf("goose dialect: %w", err)
+	}
+	if err := goose.UpContext(ctx, db, "."); err != nil {
+		return fmt.Errorf("migrate: %w", err)
+	}
+	return nil
 }
