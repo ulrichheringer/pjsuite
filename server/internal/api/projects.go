@@ -70,18 +70,23 @@ func (s *server) bindProject(c *echo.Context, keepClient int64) (project, fieldE
 		return p, nil, echo.ErrBadRequest
 	}
 	p.normalize()
+	errs, err := s.checkProject(c, p, keepClient)
+	return p, errs, err
+}
+
+func (s *server) checkProject(c *echo.Context, p project, keepClient int64) (fieldErrors, error) {
 	errs := p.validate()
 	var ok bool
 	err := s.db.QueryRowContext(c.Request().Context(),
 		`SELECT EXISTS (SELECT 1 FROM clients WHERE id = ? AND user_id = ? AND (archived_at IS NULL OR id = ?))`,
 		p.ClientID, userIDOf(c), keepClient).Scan(&ok)
 	if err != nil {
-		return p, nil, err
+		return nil, err
 	}
 	if !ok {
 		errs["client"] = "Escolha um cliente ativo."
 	}
-	return p, errs, nil
+	return errs, nil
 }
 
 func (s *server) loadProject(c *echo.Context, id int64) (project, error) {
@@ -109,7 +114,11 @@ func (s *server) createProject(c *echo.Context) error {
 	if len(errs) > 0 {
 		return invalid(c, http.StatusBadRequest, errs)
 	}
-	err = s.db.QueryRowContext(c.Request().Context(),
+	return s.insertProject(c, p)
+}
+
+func (s *server) insertProject(c *echo.Context, p project) error {
+	err := s.db.QueryRowContext(c.Request().Context(),
 		`INSERT INTO projects (user_id, client_id, name, area, reference, goal, structure) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`,
 		userIDOf(c), p.ClientID, p.Name, p.Area, p.Reference, p.Goal, p.Structure).Scan(&p.ID)
 	if err != nil {
@@ -133,6 +142,9 @@ func (s *server) putProject(c *echo.Context) error {
 	current, err := s.findProject(c)
 	if err != nil {
 		return err
+	}
+	if current.Archived {
+		return invalid(c, http.StatusConflict, fieldErrors{"archived": "Projeto arquivado."})
 	}
 	p, errs, err := s.bindProject(c, current.ClientID)
 	if err != nil {
@@ -169,4 +181,45 @@ func (s *server) listProjects(c *echo.Context) error {
 		return err
 	}
 	return c.JSON(http.StatusOK, projects)
+}
+
+func (s *server) archiveProject(c *echo.Context) error {
+	p, err := s.findProject(c)
+	if err != nil {
+		return err
+	}
+	if _, err := s.db.ExecContext(c.Request().Context(),
+		`UPDATE projects SET archived_at = COALESCE(archived_at, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) WHERE id = ?`, p.ID); err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (s *server) duplicateProject(c *echo.Context) error {
+	src, err := s.findProject(c)
+	if err != nil {
+		return err
+	}
+	var req struct {
+		Name     string `json:"name"`
+		ClientID int64  `json:"clientId"`
+	}
+	if err := c.Bind(&req); err != nil {
+		return echo.ErrBadRequest
+	}
+	p := project{ClientID: req.ClientID, Name: strings.TrimSpace(req.Name), Area: src.Area, Goal: src.Goal, Structure: src.Structure}
+	if p.ClientID == 0 {
+		p.ClientID = src.ClientID
+	}
+	if p.Name == "" {
+		p.Name = src.Name + " — cópia"
+	}
+	errs, err := s.checkProject(c, p, 0)
+	if err != nil {
+		return err
+	}
+	if len(errs) > 0 {
+		return invalid(c, http.StatusBadRequest, errs)
+	}
+	return s.insertProject(c, p)
 }

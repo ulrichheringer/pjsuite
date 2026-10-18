@@ -146,3 +146,82 @@ func TestProjectsOfAnotherUserAre404(t *testing.T) {
 		}
 	}
 }
+
+func TestProjectsArchive(t *testing.T) {
+	e := newServer(t)
+	a := signedUp(t, e)
+	b := signedUpAs(t, e, "bruno@example.com")
+	path := createdProject(t, e, a, map[string]any{"name": "Ensaio", "clientId": clientID(t, e, a, "Ana")})
+
+	if rec := send(e, http.MethodPost, path+"/archive", nil, b); rec.Code != http.StatusNotFound {
+		t.Fatalf("other user archive = %d", rec.Code)
+	}
+	if rec := send(e, http.MethodPost, path+"/archive", nil, a); rec.Code != http.StatusNoContent {
+		t.Fatalf("archive = %d %s", rec.Code, rec.Body)
+	}
+	if got := listProjects(t, e, "", a); len(got) != 0 {
+		t.Fatalf("active list = %v", got)
+	}
+	if got := listProjects(t, e, "?archived=1", a); len(got) != 1 || got[0]["archived"] != true {
+		t.Fatalf("archived list = %v", got)
+	}
+	rec := send(e, http.MethodPut, path, map[string]any{"name": "Novo", "clientId": clientID(t, e, a, "Bia")}, a)
+	if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), `"errors":{"archived"`) {
+		t.Fatalf("PUT archived = %d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestProjectsDuplicate(t *testing.T) {
+	e := newServer(t)
+	a := signedUp(t, e)
+	ana, bia := clientID(t, e, a, "Ana"), clientID(t, e, a, "Bia")
+	path := createdProject(t, e, a, map[string]any{"name": "Ensaio", "clientId": ana, "area": "Design", "reference": "PJ-1", "goal": "Identidade", "structure": "suggested"})
+
+	rec := send(e, http.MethodPost, path+"/duplicate", nil, a)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("duplicate = %d %s", rec.Code, rec.Body)
+	}
+	var got map[string]any
+	decode(t, rec, &got)
+	if got["id"] == nil || got["name"] != "Ensaio — cópia" || got["clientName"] != "Ana" || got["area"] != "Design" || got["goal"] != "Identidade" ||
+		got["structure"] != "suggested" || got["status"] != "draft" || got["reference"] != "" {
+		t.Fatalf("copy = %v", got)
+	}
+
+	rec = send(e, http.MethodPost, path+"/duplicate", map[string]any{"name": "Outro", "clientId": bia}, a)
+	decode(t, rec, &got)
+	if rec.Code != http.StatusCreated || got["name"] != "Outro" || got["clientName"] != "Bia" {
+		t.Fatalf("override = %d %v", rec.Code, got)
+	}
+
+	var orig map[string]any
+	decode(t, get(e, path, a), &orig)
+	if orig["name"] != "Ensaio" || orig["reference"] != "PJ-1" || orig["clientName"] != "Ana" {
+		t.Fatalf("original = %v", orig)
+	}
+	if got := listProjects(t, e, "", a); len(got) != 3 {
+		t.Fatalf("list = %v", got)
+	}
+
+	if rec := send(e, http.MethodPost, path+"/archive", nil, a); rec.Code != http.StatusNoContent {
+		t.Fatalf("archive = %d", rec.Code)
+	}
+	if rec := send(e, http.MethodPost, path+"/duplicate", nil, a); rec.Code != http.StatusCreated {
+		t.Fatalf("duplicate archived = %d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestProjectsDuplicateRejectsBadClient(t *testing.T) {
+	e := newServer(t)
+	a := signedUp(t, e)
+	b := signedUpAs(t, e, "bruno@example.com")
+	path := createdProject(t, e, a, map[string]any{"name": "Ensaio", "clientId": clientID(t, e, a, "Ana")})
+
+	rec := send(e, http.MethodPost, path+"/duplicate", map[string]any{"clientId": clientID(t, e, b, "Beto")}, a)
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), `"client"`) {
+		t.Fatalf("other user's client = %d %s", rec.Code, rec.Body)
+	}
+	if rec := send(e, http.MethodPost, path+"/duplicate", nil, b); rec.Code != http.StatusNotFound {
+		t.Fatalf("other user duplicate = %d", rec.Code)
+	}
+}
