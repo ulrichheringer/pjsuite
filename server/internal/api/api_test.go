@@ -264,3 +264,46 @@ func TestProfileUpdateValidation(t *testing.T) {
 		})
 	}
 }
+
+func putAvatar(e *echo.Echo, cookie *http.Cookie, body []byte) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodPut, "/api/profile/avatar", bytes.NewReader(body))
+	if cookie != nil {
+		req.AddCookie(cookie)
+	}
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	return rec
+}
+
+var pngHeader = []byte("\x89PNG\r\n\x1a\n")
+
+func TestAvatar(t *testing.T) {
+	e := newServer(t)
+	cookie := signedUp(t, e)
+
+	if rec := get(e, "/api/profile/avatar", cookie); rec.Code != http.StatusNotFound {
+		t.Fatalf("no avatar yet = %d", rec.Code)
+	}
+	if rec := putAvatar(e, nil, pngHeader); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("anonymous = %d", rec.Code)
+	}
+
+	image := append(pngHeader, "pixels"...)
+	if rec := putAvatar(e, cookie, image); rec.Code != http.StatusNoContent {
+		t.Fatalf("png = %d %s", rec.Code, rec.Body)
+	}
+	rec := get(e, "/api/profile/avatar", cookie)
+	if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "image/png" || !bytes.Equal(rec.Body.Bytes(), image) {
+		t.Fatalf("avatar = %d %s %q", rec.Code, rec.Header().Get("Content-Type"), rec.Body)
+	}
+	if !strings.Contains(get(e, "/api/profile", cookie).Body.String(), `"hasAvatar":true`) {
+		t.Fatal("profile does not report avatar")
+	}
+
+	if rec := putAvatar(e, cookie, append(pngHeader, make([]byte, 3<<20)...)); rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("3 MB = %d", rec.Code)
+	}
+	if rec := putAvatar(e, cookie, []byte("just text")); rec.Code != http.StatusUnsupportedMediaType {
+		t.Fatalf("text = %d", rec.Code)
+	}
+}

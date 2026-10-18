@@ -29,5 +29,7 @@ func New(db *sql.DB) *echo.Echo {
 	g.GET("/me", s.me, s.requireAuth)
 	g.GET("/profile", s.getProfile, s.requireAuth)
 	g.PUT("/profile", s.putProfile, s.requireAuth)
+	g.PUT("/profile/avatar", s.putAvatar, s.requireAuth)
+	g.GET("/profile/avatar", s.getAvatar, s.requireAuth)
 	return e
 }
