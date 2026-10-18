@@ -34,5 +34,12 @@ func New(db *sql.DB) *echo.Echo {
 	g.PUT("/profile", s.putProfile, s.requireAuth, bodyLimit)
 	g.PUT("/profile/avatar", s.putAvatar, s.requireAuth)
 	g.GET("/profile/avatar", s.getAvatar, s.requireAuth)
+	g.GET("/clients", s.listClients, s.requireAuth)
+	g.POST("/clients", s.createClient, s.requireAuth, bodyLimit)
+	g.GET("/clients/:id", s.getClient, s.requireAuth)
+	g.PUT("/clients/:id", s.putClient, s.requireAuth, bodyLimit)
+	g.PUT("/clients/:id/stage", s.putClientStage, s.requireAuth, bodyLimit)
+	g.POST("/clients/:id/archive", s.archiveClient, s.requireAuth)
+	g.POST("/clients/:id/restore", s.restoreClient, s.requireAuth)
 	return e
 }

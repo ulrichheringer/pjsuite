@@ -74,3 +74,42 @@ export const saveProfile = (input: ProfileInput) => call("/api/profile", json("P
 
 export const uploadAvatar = (file: File) =>
   call("/api/profile/avatar", { method: "PUT", body: file }, none);
+
+const clientSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  email: z.string(),
+  phone: z.string(),
+  company: z.string(),
+  notes: z.string(),
+  stage: z.enum(["recent", "proposal", "active"]),
+  archived: z.boolean(),
+});
+
+export type Client = z.infer<typeof clientSchema>;
+
+export const listClients = (archived = false) =>
+  call(`/api/clients${archived ? "?archived=1" : ""}`, {}, async (res) =>
+    z.array(clientSchema).parse(await res.json()),
+  );
+
+export type ClientInput = Pick<Client, "name" | "email" | "phone" | "company" | "notes">;
+
+export const createClient = (input: ClientInput) => call("/api/clients", json("POST", input), none);
+
+export const getClient = (id: string) =>
+  call(`/api/clients/${encodeURIComponent(id)}`, {}, async (res) =>
+    clientSchema.parse(await res.json()),
+  );
+
+export const updateClient = (id: string, input: ClientInput) =>
+  call(`/api/clients/${encodeURIComponent(id)}`, json("PUT", input), none);
+
+export const moveClient = (id: number, stage: Client["stage"]) =>
+  call(`/api/clients/${id}/stage`, json("PUT", { stage }), none);
+
+export const archiveClient = (id: number) =>
+  call(`/api/clients/${id}/archive`, { method: "POST" }, none);
+
+export const restoreClient = (id: number) =>
+  call(`/api/clients/${id}/restore`, { method: "POST" }, none);
