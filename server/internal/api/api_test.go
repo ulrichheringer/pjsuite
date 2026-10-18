@@ -2,6 +2,7 @@ package api_test
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -17,6 +18,12 @@ import (
 
 func newServer(t *testing.T) *echo.Echo {
 	t.Helper()
+	e, _ := newServerDB(t)
+	return e
+}
+
+func newServerDB(t *testing.T) (*echo.Echo, *sql.DB) {
+	t.Helper()
 	db, err := store.Open(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -25,7 +32,7 @@ func newServer(t *testing.T) *echo.Echo {
 	if err := store.Migrate(t.Context(), db); err != nil {
 		t.Fatal(err)
 	}
-	return api.New(db)
+	return api.New(db), db
 }
 
 func TestHealth(t *testing.T) {
@@ -99,5 +106,88 @@ func TestSignupDuplicateEmailIsCaseInsensitive(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "E-mail já cadastrado") {
 		t.Fatalf("body = %s", rec.Body)
+	}
+}
+
+func get(e *echo.Echo, path string, cookies ...*http.Cookie) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodGet, path, nil)
+	for _, c := range cookies {
+		req.AddCookie(c)
+	}
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	return rec
+}
+
+func signedUp(t *testing.T, e *echo.Echo) *http.Cookie {
+	t.Helper()
+	rec := post(e, "/api/signup", validSignup())
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("signup status = %d", rec.Code)
+	}
+	return rec.Result().Cookies()[0]
+}
+
+func TestSessionLifecycle(t *testing.T) {
+	e := newServer(t)
+	cookie := signedUp(t, e)
+
+	rec := get(e, "/api/me", cookie)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "helena@example.com") {
+		t.Fatalf("me = %d %s", rec.Code, rec.Body)
+	}
+	if rec := get(e, "/api/me"); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("anonymous me = %d", rec.Code)
+	}
+
+	if rec := post(e, "/api/logout", nil, cookie); rec.Code != http.StatusNoContent {
+		t.Fatalf("logout = %d", rec.Code)
+	}
+	if rec := get(e, "/api/me", cookie); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("me after logout = %d", rec.Code)
+	}
+}
+
+func TestExpiredSessionIsRejected(t *testing.T) {
+	e, db := newServerDB(t)
+	cookie := signedUp(t, e)
+	if _, err := db.Exec(`UPDATE sessions SET expires_at = '2000-01-01T00:00:00.000Z'`); err != nil {
+		t.Fatal(err)
+	}
+	if rec := get(e, "/api/me", cookie); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d", rec.Code)
+	}
+}
+
+func TestLogin(t *testing.T) {
+	e := newServer(t)
+	signedUp(t, e)
+	tests := []struct {
+		name, email, password string
+		status                int
+	}{
+		{"ok", "helena@example.com", "senha-segura", http.StatusNoContent},
+		{"email case-insensitive", "HELENA@example.com", "senha-segura", http.StatusNoContent},
+		{"wrong password", "helena@example.com", "outra-senha", http.StatusUnauthorized},
+		{"unknown email", "ninguem@example.com", "senha-segura", http.StatusUnauthorized},
+	}
+	var messages []string
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := post(e, "/api/login", map[string]any{"email": tt.email, "password": tt.password})
+			if rec.Code != tt.status {
+				t.Fatalf("status = %d", rec.Code)
+			}
+			if tt.status == http.StatusUnauthorized {
+				messages = append(messages, rec.Body.String())
+				return
+			}
+			if rec := get(e, "/api/me", rec.Result().Cookies()[0]); rec.Code != http.StatusOK {
+				t.Fatalf("me = %d", rec.Code)
+			}
+		})
+	}
+	if len(messages) == 2 && messages[0] != messages[1] {
+		t.Fatalf("login failures differ: %q vs %q", messages[0], messages[1])
 	}
 }

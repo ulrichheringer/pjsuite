@@ -3,6 +3,7 @@ package api
 import (
 	"crypto/rand"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
@@ -128,3 +129,84 @@ func hashToken(token string) string {
 	return hex.EncodeToString(sum[:])
 }
 
+type loginRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+func (s *server) login(c *echo.Context) error {
+	var req loginRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.ErrBadRequest
+	}
+	var (
+		userID int64
+		hash   string
+	)
+	err := s.db.QueryRowContext(c.Request().Context(),
+		`SELECT id, password_hash FROM users WHERE email = ?`, strings.TrimSpace(req.Email)).Scan(&userID, &hash)
+	if errors.Is(err, sql.ErrNoRows) || err == nil && bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.Password)) != nil {
+		return invalid(c, http.StatusUnauthorized, fieldErrors{"form": "E-mail ou senha incorretos."})
+	}
+	if err != nil {
+		return err
+	}
+	if err := s.startSession(c, userID); err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (s *server) logout(c *echo.Context) error {
+	if cookie, err := c.Cookie(sessionCookie); err == nil {
+		if _, err := s.db.ExecContext(c.Request().Context(),
+			`DELETE FROM sessions WHERE token_hash = ?`, hashToken(cookie.Value)); err != nil {
+			return err
+		}
+	}
+	c.SetCookie(&http.Cookie{Name: sessionCookie, Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteLaxMode})
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (s *server) me(c *echo.Context) error {
+	var user struct {
+		ID    int64  `json:"id"`
+		Email string `json:"email"`
+		Name  string `json:"name"`
+	}
+	user.ID = userIDOf(c)
+	err := s.db.QueryRowContext(c.Request().Context(),
+		`SELECT email, name FROM users WHERE id = ?`, user.ID).Scan(&user.Email, &user.Name)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, user)
+}
+
+const userIDKey = "userID"
+
+func userIDOf(c *echo.Context) int64 {
+	id, _ := c.Get(userIDKey).(int64)
+	return id
+}
+
+func (s *server) requireAuth(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c *echo.Context) error {
+		cookie, err := c.Cookie(sessionCookie)
+		if err != nil {
+			return echo.ErrUnauthorized
+		}
+		var userID int64
+		err = s.db.QueryRowContext(c.Request().Context(),
+			`SELECT user_id FROM sessions WHERE token_hash = ? AND expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`,
+			hashToken(cookie.Value)).Scan(&userID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return echo.ErrUnauthorized
+		}
+		if err != nil {
+			return err
+		}
+		c.Set(userIDKey, userID)
+		return next(c)
+	}
+}

@@ -24,5 +24,8 @@ func New(db *sql.DB) *echo.Echo {
 		return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 	})
 	g.POST("/signup", s.signup)
+	g.POST("/login", s.login)
+	g.POST("/logout", s.logout)
+	g.GET("/me", s.me, s.requireAuth)
 	return e
 }
