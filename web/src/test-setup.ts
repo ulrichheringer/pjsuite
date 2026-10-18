@@ -4,3 +4,9 @@ import { afterEach, expect } from "vite-plus/test";
 
 expect.extend(matchers);
 afterEach(cleanup);
+
+globalThis.ResizeObserver = class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};

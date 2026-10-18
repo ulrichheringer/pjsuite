@@ -199,14 +199,26 @@ export function Loading() {
     </div>
   );
 }
-export function Avatar({ name = "Helena Duarte", size = "" }: { name?: string; size?: string }) {
+export function Avatar({
+  name = "Helena Duarte",
+  size = "",
+  src,
+}: {
+  name?: string;
+  size?: string;
+  src?: string;
+}) {
   return (
     <span className={`avatar ${size}`} aria-label={name}>
-      {name
-        .split(" ")
-        .slice(0, 2)
-        .map((s) => s[0])
-        .join("")}
+      {src ? (
+        <img src={src} alt="" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }} />
+      ) : (
+        name
+          .split(" ")
+          .slice(0, 2)
+          .map((s) => s[0])
+          .join("")
+      )}
     </span>
   );
 }
@@ -236,18 +248,30 @@ export function FileRow({
     </div>
   );
 }
-export function UploadBox({ onFiles }: { onFiles?: (files: File[]) => void }) {
+export function UploadBox({
+  onFiles,
+  title = "Escolher arquivos",
+  hint = "PDF, JPG, PNG ou ZIP · até 20 MB por arquivo",
+  accept = ".pdf,.jpg,.jpeg,.png,.zip",
+  multiple = true,
+}: {
+  onFiles?: (files: File[]) => void;
+  title?: string;
+  hint?: string;
+  accept?: string;
+  multiple?: boolean;
+}) {
   const id = useId();
   return (
     <label htmlFor={id} className="upload-box">
       <Upload size={24} />
-      <strong>Escolher arquivos</strong>
-      <span>PDF, JPG, PNG ou ZIP · até 20 MB por arquivo</span>
+      <strong>{title}</strong>
+      <span>{hint}</span>
       <input
         id={id}
         type="file"
-        multiple
-        accept=".pdf,.jpg,.jpeg,.png,.zip"
+        multiple={multiple}
+        accept={accept}
         onChange={(e) => onFiles?.(Array.from(e.target.files || []))}
       />
     </label>
@@ -292,5 +316,22 @@ export function Timeline({
         </li>
       ))}
     </ol>
+  );
+}
+export function Logo({ inverse = false }: { inverse?: boolean }) {
+  return (
+    <span className={`logo ${inverse ? "inverse" : ""}`}>
+      <svg viewBox="0 0 36 36" aria-hidden="true">
+        <path
+          d="M7 29V7h11a7 7 0 0 1 0 14h-5M29 7v16a6 6 0 0 1-6 6h-5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="3.2"
+        />
+      </svg>
+      <span>
+        PJ <strong>Suite</strong>
+      </span>
+    </span>
   );
 }
