@@ -1,0 +1,93 @@
+package api_test
+
+import (
+	"net/http"
+	"strings"
+	"testing"
+
+	"github.com/labstack/echo/v5"
+)
+
+func clientID(t *testing.T, e *echo.Echo, cookie *http.Cookie, name string) int {
+	t.Helper()
+	path := createdClient(t, e, cookie, name)
+	var got struct{ ID int }
+	decode(t, get(e, path, cookie), &got)
+	return got.ID
+}
+
+func listProjects(t *testing.T, e *echo.Echo, query string, cookie *http.Cookie) []map[string]any {
+	t.Helper()
+	rec := get(e, "/api/projects"+query, cookie)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list = %d %s", rec.Code, rec.Body)
+	}
+	var got []map[string]any
+	decode(t, rec, &got)
+	return got
+}
+
+func TestProjectsCreateValidation(t *testing.T) {
+	tests := []struct {
+		name, field string
+		mutate      func(body map[string]any, otherClient, archivedClient int)
+	}{
+		{"empty name", "name", func(b map[string]any, _, _ int) { b["name"] = " " }},
+		{"name over 120", "name", func(b map[string]any, _, _ int) { b["name"] = strings.Repeat("a", 121) }},
+		{"invalid area", "area", func(b map[string]any, _, _ int) { b["area"] = "Culinária" }},
+		{"reference over 40", "reference", func(b map[string]any, _, _ int) { b["reference"] = strings.Repeat("a", 41) }},
+		{"invalid structure", "structure", func(b map[string]any, _, _ int) { b["structure"] = "x" }},
+		{"missing client", "client", func(b map[string]any, _, _ int) { delete(b, "clientId") }},
+		{"other user's client", "client", func(b map[string]any, other, _ int) { b["clientId"] = other }},
+		{"archived client", "client", func(b map[string]any, _, archived int) { b["clientId"] = archived }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := newServer(t)
+			a := signedUp(t, e)
+			b := signedUpAs(t, e, "bruno@example.com")
+			archived := createdClient(t, e, a, "Velho")
+			if rec := send(e, http.MethodPost, archived+"/archive", nil, a); rec.Code != http.StatusNoContent {
+				t.Fatalf("archive = %d", rec.Code)
+			}
+			var arch struct{ ID int }
+			decode(t, get(e, archived, a), &arch)
+			body := map[string]any{"name": "Ensaio", "clientId": clientID(t, e, a, "Ana")}
+			tt.mutate(body, clientID(t, e, b, "Beto"), arch.ID)
+
+			rec := send(e, http.MethodPost, "/api/projects", body, a)
+			var got struct{ Errors map[string]string }
+			decode(t, rec, &got)
+			if rec.Code != http.StatusBadRequest || got.Errors[tt.field] == "" {
+				t.Fatalf("POST = %d %s", rec.Code, rec.Body)
+			}
+		})
+	}
+}
+
+func TestProjectsCreateAndListOwnOnly(t *testing.T) {
+	e := newServer(t)
+	a := signedUp(t, e)
+	b := signedUpAs(t, e, "bruno@example.com")
+	cid := clientID(t, e, a, "Ana")
+
+	rec := send(e, http.MethodPost, "/api/projects", map[string]any{"name": " Ensaio ", "clientId": cid, "area": "Fotografia", "reference": "PJ-1", "goal": "Retratos"}, a)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("POST = %d %s", rec.Code, rec.Body)
+	}
+
+	got := listProjects(t, e, "", a)
+	if len(got) != 1 {
+		t.Fatalf("A list = %v", got)
+	}
+	p := got[0]
+	if p["name"] != "Ensaio" || p["clientName"] != "Ana" || p["structure"] != "essential" || p["status"] != "draft" || p["area"] != "Fotografia" || p["archived"] != false {
+		t.Fatalf("project = %v", p)
+	}
+	if got := listProjects(t, e, "", b); len(got) != 0 {
+		t.Fatalf("B sees A's projects: %v", got)
+	}
+	if rec := get(e, "/api/projects"); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("anonymous = %d", rec.Code)
+	}
+}
