@@ -20,6 +20,8 @@ const (
 	sessionCookie = "pjsuite_session"
 	sessionTTL    = 30 * 24 * time.Hour
 	sqliteUnique  = 2067
+
+	maxPasswordBytes = 72
 )
 
 type fieldErrors map[string]string
@@ -43,8 +45,8 @@ func (r signupRequest) validate() fieldErrors {
 	if !strings.Contains(r.Email, "@") {
 		errs["email"] = "Confira seu e-mail."
 	}
-	if len(r.Password) < 8 {
-		errs["password"] = "Confira a senha. Use pelo menos 8 caracteres."
+	if len(r.Password) < 8 || len(r.Password) > maxPasswordBytes {
+		errs["password"] = "Confira a senha. Use de 8 a 72 caracteres."
 	}
 	if !r.AcceptTerms {
 		errs["acceptTerms"] = "Aceite os termos para continuar."
@@ -129,6 +131,8 @@ func hashToken(token string) string {
 	return hex.EncodeToString(sum[:])
 }
 
+const absentUserHash = "$2a$10$PTJTnhKCGWzkqphyDZLS/Oei67zXs5BpbMo5yERO4xsZW6jVLomZe"
+
 type loginRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
@@ -145,11 +149,13 @@ func (s *server) login(c *echo.Context) error {
 	)
 	err := s.db.QueryRowContext(c.Request().Context(),
 		`SELECT id, password_hash FROM users WHERE email = ?`, strings.TrimSpace(req.Email)).Scan(&userID, &hash)
-	if errors.Is(err, sql.ErrNoRows) || err == nil && bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.Password)) != nil {
-		return invalid(c, http.StatusUnauthorized, fieldErrors{"form": "E-mail ou senha incorretos."})
-	}
-	if err != nil {
+	if errors.Is(err, sql.ErrNoRows) {
+		hash = absentUserHash
+	} else if err != nil {
 		return err
+	}
+	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.Password)) != nil || err != nil {
+		return invalid(c, http.StatusUnauthorized, fieldErrors{"form": "E-mail ou senha incorretos."})
 	}
 	if err := s.startSession(c, userID); err != nil {
 		return err

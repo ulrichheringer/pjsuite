@@ -8,6 +8,8 @@ import (
 	"github.com/labstack/echo/v5/middleware"
 )
 
+const maxJSONBytes = 1 << 20
+
 type server struct{ db *sql.DB }
 
 func New(db *sql.DB) *echo.Echo {
@@ -23,12 +25,13 @@ func New(db *sql.DB) *echo.Echo {
 		}
 		return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 	})
-	g.POST("/signup", s.signup)
-	g.POST("/login", s.login)
+	bodyLimit := middleware.BodyLimit(maxJSONBytes)
+	g.POST("/signup", s.signup, bodyLimit)
+	g.POST("/login", s.login, bodyLimit)
 	g.POST("/logout", s.logout)
 	g.GET("/me", s.me, s.requireAuth)
 	g.GET("/profile", s.getProfile, s.requireAuth)
-	g.PUT("/profile", s.putProfile, s.requireAuth)
+	g.PUT("/profile", s.putProfile, s.requireAuth, bodyLimit)
 	g.PUT("/profile/avatar", s.putAvatar, s.requireAuth)
 	g.GET("/profile/avatar", s.getAvatar, s.requireAuth)
 	return e

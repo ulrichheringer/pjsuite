@@ -28,6 +28,7 @@ async function call<T>(
   path: string,
   init: RequestInit,
   parse: (res: Response) => Promise<T>,
+  { guard401 = true } = {},
 ): Promise<Outcome<T>> {
   let res: Response;
   try {
@@ -35,8 +36,14 @@ async function call<T>(
   } catch {
     return { kind: "failed", status: 0 };
   }
-  if (res.ok) return { kind: "ok", value: await parse(res) };
-  if (res.status === 401 && !path.endsWith("/login")) return { kind: "unauthorized" };
+  if (res.ok) {
+    try {
+      return { kind: "ok", value: await parse(res) };
+    } catch {
+      return { kind: "failed", status: res.status };
+    }
+  }
+  if (res.status === 401 && guard401) return { kind: "unauthorized" };
   const body = errorsBody.safeParse(await res.json().catch(() => null));
   if (body.success) return { kind: "invalid", status: res.status, errors: body.data.errors };
   return { kind: "failed", status: res.status };
@@ -58,7 +65,7 @@ export const signup = (input: {
 }) => call("/api/signup", json("POST", input), none);
 
 export const login = (input: { email: string; password: string }) =>
-  call("/api/login", json("POST", input), none);
+  call("/api/login", json("POST", input), none, { guard401: false });
 
 export const getProfile = () =>
   call("/api/profile", {}, async (res) => profileSchema.parse(await res.json()));

@@ -20,6 +20,8 @@ CREATE TABLE profiles (
     avatar_type   TEXT NOT NULL DEFAULT ''
 ) STRICT;
 
+INSERT INTO profiles (user_id, name, contact_email) SELECT id, name, email FROM users;
+
 -- +goose Down
 DROP TABLE profiles;
 DROP TABLE sessions;

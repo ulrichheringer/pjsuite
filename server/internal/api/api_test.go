@@ -44,7 +44,10 @@ func TestHealth(t *testing.T) {
 }
 
 func post(e *echo.Echo, path string, body any, cookies ...*http.Cookie) *httptest.ResponseRecorder {
-	buf, _ := json.Marshal(body)
+	buf, err := json.Marshal(body)
+	if err != nil {
+		panic(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, path, bytes.NewReader(buf))
 	req.Header.Set("Content-Type", "application/json")
 	for _, c := range cookies {
@@ -69,6 +72,7 @@ func TestSignup(t *testing.T) {
 		{"ok", func(map[string]any) {}, http.StatusCreated, ""},
 		{"email without @", func(b map[string]any) { b["email"] = "helena.example.com" }, http.StatusBadRequest, "email"},
 		{"short password", func(b map[string]any) { b["password"] = "1234567" }, http.StatusBadRequest, "password"},
+		{"password over bcrypt limit", func(b map[string]any) { b["password"] = strings.Repeat("a", 73) }, http.StatusBadRequest, "password"},
 		{"missing name", func(b map[string]any) { b["name"] = " " }, http.StatusBadRequest, "name"},
 		{"terms not accepted", func(b map[string]any) { b["acceptTerms"] = false }, http.StatusBadRequest, "acceptTerms"},
 	}
@@ -82,7 +86,7 @@ func TestSignup(t *testing.T) {
 			}
 			if tt.field != "" {
 				var got struct{ Errors map[string]string }
-				json.Unmarshal(rec.Body.Bytes(), &got)
+				decode(t, rec, &got)
 				if got.Errors[tt.field] == "" {
 					t.Fatalf("no error for %q: %s", tt.field, rec.Body)
 				}
@@ -92,6 +96,14 @@ func TestSignup(t *testing.T) {
 				t.Fatalf("want one HttpOnly session cookie, got %v", rec.Result().Cookies())
 			}
 		})
+	}
+}
+
+func TestSignupRejectsOversizedBody(t *testing.T) {
+	body := validSignup()
+	body["name"] = strings.Repeat("a", 2<<20)
+	if rec := post(newServer(t), "/api/signup", body); rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("status = %d", rec.Code)
 	}
 }
 
@@ -187,13 +199,16 @@ func TestLogin(t *testing.T) {
 			}
 		})
 	}
-	if len(messages) == 2 && messages[0] != messages[1] {
+	if len(messages) != 2 || messages[0] != messages[1] {
 		t.Fatalf("login failures differ: %q vs %q", messages[0], messages[1])
 	}
 }
 
 func send(e *echo.Echo, method, path string, body any, cookie *http.Cookie) *httptest.ResponseRecorder {
-	buf, _ := json.Marshal(body)
+	buf, err := json.Marshal(body)
+	if err != nil {
+		panic(err)
+	}
 	req := httptest.NewRequest(method, path, bytes.NewReader(buf))
 	req.Header.Set("Content-Type", "application/json")
 	if cookie != nil {
@@ -217,8 +232,8 @@ func TestProfileRequiresAuth(t *testing.T) {
 func TestProfileIsPrefilledAtSignup(t *testing.T) {
 	e := newServer(t)
 	rec := get(e, "/api/profile", signedUp(t, e))
-	var got map[string]string
-	json.Unmarshal(rec.Body.Bytes(), &got)
+	var got map[string]any
+	decode(t, rec, &got)
 	if got["name"] != "Helena Duarte" || got["contactEmail"] != "helena@example.com" {
 		t.Fatalf("profile = %s", rec.Body)
 	}
@@ -235,7 +250,7 @@ func TestProfileUpdateRoundTrips(t *testing.T) {
 		t.Fatalf("PUT = %d %s", rec.Code, rec.Body)
 	}
 	var got map[string]any
-	json.Unmarshal(get(e, "/api/profile", cookie).Body.Bytes(), &got)
+	decode(t, get(e, "/api/profile", cookie), &got)
 	for k, v := range want {
 		if got[k] != v {
 			t.Errorf("%s = %v, want %v", k, got[k], v)
@@ -305,5 +320,12 @@ func TestAvatar(t *testing.T) {
 	}
 	if rec := putAvatar(e, cookie, []byte("just text")); rec.Code != http.StatusUnsupportedMediaType {
 		t.Fatalf("text = %d", rec.Code)
+	}
+}
+
+func decode(t *testing.T, rec *httptest.ResponseRecorder, v any) {
+	t.Helper()
+	if err := json.Unmarshal(rec.Body.Bytes(), v); err != nil {
+		t.Fatalf("decode %q: %v", rec.Body, err)
 	}
 }

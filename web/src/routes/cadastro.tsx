@@ -23,7 +23,7 @@ function Signup() {
     setPending(true);
     const outcome = await signup({ name, email, password, acceptTerms });
     setPending(false);
-    setFailed(outcome.kind === "failed" || outcome.kind === "unauthorized");
+    setFailed(outcome.kind === "failed");
     setErrors(outcome.kind === "invalid" ? outcome.errors : {});
     if (outcome.kind === "ok") await navigate({ to: "/perfil" });
   }

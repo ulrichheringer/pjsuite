@@ -46,10 +46,7 @@ export function AuthLayout({
           <p>{subtitle}</p>
           {children}
           <p className="auth-switch">
-            {switchText}{" "}
-            <Link to={switchTo} style={{ fontWeight: 700, textDecoration: "underline" }}>
-              {switchLabel}
-            </Link>
+            {switchText} <Link to={switchTo}>{switchLabel}</Link>
           </p>
         </div>
       </div>

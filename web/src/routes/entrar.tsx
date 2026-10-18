@@ -49,14 +49,7 @@ function Login() {
           onChange={setEmail}
           required
         />
-        <Field
-          label="Senha"
-          type="password"
-          placeholder="Pelo menos 8 caracteres"
-          value={password}
-          onChange={setPassword}
-          required
-        />
+        <Field label="Senha" type="password" value={password} onChange={setPassword} required />
         <Button type="submit" className="full" disabled={pending}>
           {pending ? "Entrando…" : "Entrar"}
           <ArrowRight size={18} />
