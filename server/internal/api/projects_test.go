@@ -2,6 +2,7 @@ package api_test
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -89,5 +90,59 @@ func TestProjectsCreateAndListOwnOnly(t *testing.T) {
 	}
 	if rec := get(e, "/api/projects"); rec.Code != http.StatusUnauthorized {
 		t.Fatalf("anonymous = %d", rec.Code)
+	}
+}
+
+func createdProject(t *testing.T, e *echo.Echo, cookie *http.Cookie, body map[string]any) string {
+	t.Helper()
+	rec := send(e, http.MethodPost, "/api/projects", body, cookie)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create = %d %s", rec.Code, rec.Body)
+	}
+	var got struct{ ID int }
+	decode(t, rec, &got)
+	return "/api/projects/" + strconv.Itoa(got.ID)
+}
+
+func TestProjectsUpdatePersists(t *testing.T) {
+	e := newServer(t)
+	a := signedUp(t, e)
+	ana, bia := clientID(t, e, a, "Ana"), clientID(t, e, a, "Bia")
+	path := createdProject(t, e, a, map[string]any{"name": "Ensaio", "clientId": ana, "structure": "suggested"})
+
+	want := map[string]any{"name": "Ensaio de marca", "clientId": bia, "area": "Design", "reference": "PJ-2", "goal": "Identidade", "structure": "blank"}
+	if rec := send(e, http.MethodPut, path, want, a); rec.Code != http.StatusNoContent {
+		t.Fatalf("PUT = %d %s", rec.Code, rec.Body)
+	}
+	var got map[string]any
+	decode(t, get(e, path, a), &got)
+	for _, k := range []string{"name", "area", "reference", "goal"} {
+		if got[k] != want[k] {
+			t.Errorf("%s = %v, want %v", k, got[k], want[k])
+		}
+	}
+	if got["clientName"] != "Bia" || got["structure"] != "suggested" || got["status"] != "draft" {
+		t.Errorf("project = %v", got)
+	}
+
+	if rec := send(e, http.MethodPut, path, map[string]any{"name": "", "clientId": ana}, a); rec.Code != http.StatusBadRequest {
+		t.Fatalf("invalid PUT = %d", rec.Code)
+	}
+}
+
+func TestProjectsOfAnotherUserAre404(t *testing.T) {
+	e := newServer(t)
+	a := signedUp(t, e)
+	b := signedUpAs(t, e, "bruno@example.com")
+	path := createdProject(t, e, a, map[string]any{"name": "Ensaio", "clientId": clientID(t, e, a, "Ana")})
+
+	for _, tt := range []struct{ method, path string }{
+		{http.MethodGet, path},
+		{http.MethodPut, path},
+		{http.MethodGet, "/api/projects/abc"},
+	} {
+		if rec := send(e, tt.method, tt.path, map[string]any{"name": "X"}, b); rec.Code != http.StatusNotFound {
+			t.Errorf("%s %s = %d", tt.method, tt.path, rec.Code)
+		}
 	}
 }

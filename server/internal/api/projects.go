@@ -1,8 +1,11 @@
 package api
 
 import (
+	"database/sql"
+	"errors"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -61,26 +64,47 @@ func (p project) validate() fieldErrors {
 	return errs
 }
 
-func (s *server) activeClientExists(c *echo.Context, id int64) (bool, error) {
-	var ok bool
-	err := s.db.QueryRowContext(c.Request().Context(),
-		`SELECT EXISTS (SELECT 1 FROM clients WHERE id = ? AND user_id = ? AND archived_at IS NULL)`, id, userIDOf(c)).Scan(&ok)
-	return ok, err
-}
-
-func (s *server) createProject(c *echo.Context) error {
+func (s *server) bindProject(c *echo.Context, keepClient int64) (project, fieldErrors, error) {
 	var p project
 	if err := c.Bind(&p); err != nil {
-		return echo.ErrBadRequest
+		return p, nil, echo.ErrBadRequest
 	}
 	p.normalize()
 	errs := p.validate()
-	ok, err := s.activeClientExists(c, p.ClientID)
+	var ok bool
+	err := s.db.QueryRowContext(c.Request().Context(),
+		`SELECT EXISTS (SELECT 1 FROM clients WHERE id = ? AND user_id = ? AND (archived_at IS NULL OR id = ?))`,
+		p.ClientID, userIDOf(c), keepClient).Scan(&ok)
 	if err != nil {
-		return err
+		return p, nil, err
 	}
 	if !ok {
 		errs["client"] = "Escolha um cliente ativo."
+	}
+	return p, errs, nil
+}
+
+func (s *server) loadProject(c *echo.Context, id int64) (project, error) {
+	var p project
+	err := p.scan(s.db.QueryRowContext(c.Request().Context(), projectSelect+` WHERE p.id = ? AND p.user_id = ?`, id, userIDOf(c)))
+	if errors.Is(err, sql.ErrNoRows) {
+		return p, echo.ErrNotFound
+	}
+	return p, err
+}
+
+func (s *server) findProject(c *echo.Context) (project, error) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		return project{}, echo.ErrNotFound
+	}
+	return s.loadProject(c, id)
+}
+
+func (s *server) createProject(c *echo.Context) error {
+	p, errs, err := s.bindProject(c, 0)
+	if err != nil {
+		return err
 	}
 	if len(errs) > 0 {
 		return invalid(c, http.StatusBadRequest, errs)
@@ -91,10 +115,38 @@ func (s *server) createProject(c *echo.Context) error {
 	if err != nil {
 		return err
 	}
-	if err := p.scan(s.db.QueryRowContext(c.Request().Context(), projectSelect+` WHERE p.id = ?`, p.ID)); err != nil {
+	if p, err = s.loadProject(c, p.ID); err != nil {
 		return err
 	}
 	return c.JSON(http.StatusCreated, p)
+}
+
+func (s *server) getProject(c *echo.Context) error {
+	p, err := s.findProject(c)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, p)
+}
+
+func (s *server) putProject(c *echo.Context) error {
+	current, err := s.findProject(c)
+	if err != nil {
+		return err
+	}
+	p, errs, err := s.bindProject(c, current.ClientID)
+	if err != nil {
+		return err
+	}
+	if len(errs) > 0 {
+		return invalid(c, http.StatusBadRequest, errs)
+	}
+	if _, err := s.db.ExecContext(c.Request().Context(),
+		`UPDATE projects SET client_id = ?, name = ?, area = ?, reference = ?, goal = ? WHERE id = ?`,
+		p.ClientID, p.Name, p.Area, p.Reference, p.Goal, current.ID); err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
 }
 
 func (s *server) listProjects(c *echo.Context) error {
