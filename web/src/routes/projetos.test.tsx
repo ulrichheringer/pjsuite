@@ -231,7 +231,7 @@ const openMenu = (name: string, item: string) =>
 
 test("duplicating posts the default name and shows the new card", async () => {
   const copy = project(10, "Ensaio de marca — cópia", "Ana Lima");
-  const fetchSpy = mockFetch((path, init) => {
+  const fetchSpy = mockFetch((path) => {
     if (path === "/api/clients") return jsonResponse(200, clientList);
     if (path === "/api/projects/1/duplicate") return jsonResponse(201, copy);
     return listing(path);
