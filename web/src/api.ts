@@ -8,6 +8,8 @@ export type Outcome<T = undefined> =
   | { kind: "unauthorized" }
   | { kind: "failed"; status: number };
 
+export const areas = ["Fotografia", "Design", "Produção", "Outros serviços criativos"];
+
 export const profileSchema = z.object({
   name: z.string(),
   businessName: z.string(),
@@ -113,3 +115,47 @@ export const archiveClient = (id: number) =>
 
 export const restoreClient = (id: number) =>
   call(`/api/clients/${id}/restore`, { method: "POST" }, none);
+
+const projectSchema = z.object({
+  id: z.number(),
+  clientId: z.number(),
+  clientName: z.string(),
+  name: z.string(),
+  area: z.string(),
+  reference: z.string(),
+  goal: z.string(),
+  structure: z.enum(["blank", "essential", "suggested"]),
+  status: z.literal("draft"),
+  archived: z.boolean(),
+});
+
+export type Project = z.infer<typeof projectSchema>;
+
+export const listProjects = (archived = false) =>
+  call(`/api/projects${archived ? "?archived=1" : ""}`, {}, async (res) =>
+    z.array(projectSchema).parse(await res.json()),
+  );
+
+export type ProjectInput = Pick<
+  Project,
+  "clientId" | "name" | "area" | "reference" | "goal" | "structure"
+>;
+
+export const createProject = (input: ProjectInput) =>
+  call("/api/projects", json("POST", input), async (res) => projectSchema.parse(await res.json()));
+
+export const getProject = (id: string) =>
+  call(`/api/projects/${encodeURIComponent(id)}`, {}, async (res) =>
+    projectSchema.parse(await res.json()),
+  );
+
+export const updateProject = (id: string, input: Omit<ProjectInput, "structure">) =>
+  call(`/api/projects/${encodeURIComponent(id)}`, json("PUT", input), none);
+
+export const duplicateProject = (id: number, input: { name: string; clientId: number }) =>
+  call(`/api/projects/${id}/duplicate`, json("POST", input), async (res) =>
+    projectSchema.parse(await res.json()),
+  );
+
+export const archiveProject = (id: number) =>
+  call(`/api/projects/${id}/archive`, { method: "POST" }, none);

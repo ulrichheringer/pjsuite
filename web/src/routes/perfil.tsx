@@ -1,12 +1,17 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
-import { getProfile, saveProfile, uploadAvatar, type FieldErrors, type ProfileInput } from "@/api";
+import {
+  areas,
+  getProfile,
+  saveProfile,
+  uploadAvatar,
+  type FieldErrors,
+  type ProfileInput,
+} from "@/api";
 import { Avatar, Banner, Button, Choice, Field, Loading, UploadBox } from "@/ui";
 
 export const Route = createFileRoute("/perfil")({ component: ProfilePage });
-
-const areas = ["Fotografia", "Design", "Produção", "Outros serviços criativos"];
 
 const avatarErrors: Record<number, string> = {
   413: "A imagem deve ter até 2 MB.",
