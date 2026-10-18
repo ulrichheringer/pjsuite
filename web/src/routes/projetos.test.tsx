@@ -101,7 +101,10 @@ test("new project form offers only active clients and posts the structure", asyn
   const user = userEvent.setup();
   await user.type(await screen.findByLabelText(/Nome do projeto/), "Ensaio novo");
   await screen.findByRole("option", { name: "Bruno Costa" });
-  expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual(["Ana Lima", "Bruno Costa"]);
+  expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
+    "Ana Lima",
+    "Bruno Costa",
+  ]);
   expect(fetchSpy.mock.calls.map(([path]) => path)).not.toContain("/api/clients?archived=1");
   await user.selectOptions(screen.getByLabelText("Cliente"), "Bruno Costa");
   await user.click(screen.getByRole("button", { name: /Estrutura sugerida/ }));
@@ -165,7 +168,7 @@ const editing = project(5, "Ensaio de marca", "Bruno Costa", {
   structure: "suggested",
 });
 
-const editRoutes = (extra?: Parameters<typeof mockFetch>[0]) =>
+const editRoutes = (extra?: (path: string, init?: RequestInit) => Response | undefined) =>
   mockFetch((path, init) => {
     if (path === "/api/clients") return jsonResponse(200, clientList);
     if (path === "/api/projects/5" && !init?.method) return jsonResponse(200, editing);
@@ -184,7 +187,9 @@ test("edit form is prefilled, shows the version note and hides the structure", a
 });
 
 test("edit form saves the changes without the structure", async () => {
-  const fetchSpy = editRoutes((_, init) => (init?.method === "PUT" ? jsonResponse(204) : undefined));
+  const fetchSpy = editRoutes((_, init) =>
+    init?.method === "PUT" ? jsonResponse(204) : undefined,
+  );
   renderAt("/projetos/5");
   const user = userEvent.setup();
   const name = await screen.findByLabelText(/Nome do projeto/);
@@ -197,7 +202,12 @@ test("edit form saves the changes without the structure", async () => {
   const put = fetchSpy.mock.calls.find(([, init]) => init?.method === "PUT")!;
   expect(put[0]).toBe("/api/projects/5");
   const body = JSON.parse(String(put[1]?.body));
-  expect(body).toMatchObject({ name: "Marca nova", clientId: 1, area: "Design", reference: "PJ-7" });
+  expect(body).toMatchObject({
+    name: "Marca nova",
+    clientId: 1,
+    area: "Design",
+    reference: "PJ-7",
+  });
   expect(body).not.toHaveProperty("structure");
 });
 
@@ -231,21 +241,29 @@ test("duplicating posts the default name and shows the new card", async () => {
   await openMenu("Ensaio de marca", "Duplicar projeto");
 
   const dialog = await screen.findByRole("dialog");
-  expect(within(dialog).getByLabelText("Nome do novo projeto")).toHaveValue("Ensaio de marca — cópia");
+  expect(within(dialog).getByLabelText("Nome do novo projeto")).toHaveValue(
+    "Ensaio de marca — cópia",
+  );
   await within(dialog).findByRole("option", { name: "Bruno Costa" });
-  await userEvent.setup().click(within(dialog).getByRole("button", { name: /Duplicar como rascunho/ }));
+  await userEvent
+    .setup()
+    .click(within(dialog).getByRole("button", { name: /Duplicar como rascunho/ }));
 
   expect(await screen.findByText("Projeto criado.")).toBeInTheDocument();
   expect(screen.getByText("Ensaio de marca — cópia")).toBeInTheDocument();
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   const post = fetchSpy.mock.calls.find(([path]) => path === "/api/projects/1/duplicate")!;
-  expect(JSON.parse(String(post[1]?.body))).toEqual({ name: "Ensaio de marca — cópia", clientId: 1 });
+  expect(JSON.parse(String(post[1]?.body))).toEqual({
+    name: "Ensaio de marca — cópia",
+    clientId: 1,
+  });
 });
 
 test("duplicating lets the name and client be changed", async () => {
   const fetchSpy = mockFetch((path) => {
     if (path === "/api/clients") return jsonResponse(200, clientList);
-    if (path === "/api/projects/1/duplicate") return jsonResponse(201, project(10, "Outro", "Bruno Costa"));
+    if (path === "/api/projects/1/duplicate")
+      return jsonResponse(201, project(10, "Outro", "Bruno Costa"));
     return listing(path);
   });
   renderAt("/projetos");
@@ -261,4 +279,48 @@ test("duplicating lets the name and client be changed", async () => {
   await screen.findByText("Projeto criado.");
   const post = fetchSpy.mock.calls.find(([path]) => path === "/api/projects/1/duplicate")!;
   expect(JSON.parse(String(post[1]?.body))).toEqual({ name: "Outro", clientId: 2 });
+});
+
+test("Manter ativo closes the dialog without calling the API", async () => {
+  const fetchSpy = mockFetch(listing);
+  renderAt("/projetos");
+  await screen.findByText("Ensaio de marca");
+  await openMenu("Ensaio de marca", "Arquivar projeto");
+  const dialog = await screen.findByRole("alertdialog");
+  expect(dialog).toHaveTextContent("Arquivar este projeto?");
+  await userEvent.setup().click(within(dialog).getByRole("button", { name: "Manter ativo" }));
+  await vi.waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+  expect(fetchSpy.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
+  expect(screen.getByText("Ensaio de marca")).toBeInTheDocument();
+});
+
+test("confirming archives the project and lists it under Arquivados", async () => {
+  const fetchSpy = mockFetch((path, init) =>
+    path === "/api/projects/1/archive" && init?.method === "POST"
+      ? jsonResponse(204)
+      : listing(path),
+  );
+  renderAt("/projetos");
+  await screen.findByText("Ensaio de marca");
+  await openMenu("Ensaio de marca", "Arquivar projeto");
+  const dialog = await screen.findByRole("alertdialog");
+  await userEvent.setup().click(within(dialog).getByRole("button", { name: "Arquivar projeto" }));
+
+  await vi.waitFor(() => expect(screen.queryByText("Ensaio de marca")).not.toBeInTheDocument());
+  expect(fetchSpy.mock.calls.some(([path]) => path === "/api/projects/1/archive")).toBe(true);
+  await userEvent.setup().click(screen.getByRole("tab", { name: /Arquivados/ }));
+  expect(screen.getByText("Ensaio de marca")).toBeInTheDocument();
+});
+
+test("a failed archive keeps the card and shows an error", async () => {
+  mockFetch((path, init) => (init?.method === "POST" ? jsonResponse(500) : listing(path)));
+  renderAt("/projetos");
+  await screen.findByText("Ensaio de marca");
+  await openMenu("Ensaio de marca", "Arquivar projeto");
+  const dialog = await screen.findByRole("alertdialog");
+  await userEvent.setup().click(within(dialog).getByRole("button", { name: "Arquivar projeto" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Não foi possível arquivar o projeto.",
+  );
+  expect(screen.getByText("Ensaio de marca")).toBeInTheDocument();
 });

@@ -156,3 +156,6 @@ export const duplicateProject = (id: number, input: { name: string; clientId: nu
   call(`/api/projects/${id}/duplicate`, json("POST", input), async (res) =>
     projectSchema.parse(await res.json()),
   );
+
+export const archiveProject = (id: number) =>
+  call(`/api/projects/${id}/archive`, { method: "POST" }, none);

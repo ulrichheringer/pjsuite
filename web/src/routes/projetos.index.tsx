@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ArrowUpRight, Briefcase, Copy, MoreHorizontal, Plus, Search } from "lucide-react";
 import {
+  archiveProject,
   duplicateProject,
   listClients,
   listProjects,
@@ -9,6 +10,17 @@ import {
   type FieldErrors,
   type Project,
 } from "@/api";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import {
   DropdownMenu,
@@ -31,6 +43,18 @@ function ProjectsPage() {
   const navigate = useNavigate();
   const [active, setActive] = useState<Project[]>();
   const [archived, setArchived] = useState<Project[]>([]);
+  const [toArchive, setToArchive] = useState<Project>();
+  const [actionFailure, setActionFailure] = useState<string>();
+
+  async function archive(project: Project) {
+    const outcome = await archiveProject(project.id);
+    if (outcome.kind === "unauthorized") return navigate({ to: "/entrar" });
+    if (outcome.kind !== "ok") return setActionFailure("Não foi possível arquivar o projeto.");
+    setActionFailure(undefined);
+    setActive((list) => list?.filter((p) => p.id !== project.id));
+    setArchived((list) => [{ ...project, archived: true }, ...list]);
+    toast.success("Projeto arquivado.");
+  }
   const [tab, setTab] = useState<"active" | "archived">("active");
   const [failed, setFailed] = useState(false);
   const [query, setQuery] = useState("");
@@ -68,6 +92,11 @@ function ProjectsPage() {
           </Button>
         </header>
         {created && <Banner title="Projeto criado." tone="success" />}
+        {actionFailure && (
+          <Banner title={actionFailure} tone="danger">
+            Nada foi alterado. Tente novamente.
+          </Banner>
+        )}
         {failed ? (
           <Banner title="Não foi possível carregar os projetos." tone="danger">
             Tente novamente em instantes.
@@ -125,6 +154,11 @@ function ProjectsPage() {
                           <DropdownMenuItem onClick={() => setToDuplicate(p)}>
                             Duplicar projeto
                           </DropdownMenuItem>
+                          {!p.archived && (
+                            <DropdownMenuItem onClick={() => setToArchive(p)}>
+                              Arquivar projeto
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
@@ -181,6 +215,23 @@ function ProjectsPage() {
             )}
           </>
         )}
+        <AlertDialog open={!!toArchive} onOpenChange={(open) => !open && setToArchive(undefined)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Arquivar este projeto?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {toArchive?.name} sairá da lista de ativos. O contrato, o link e o histórico
+                permanecem disponíveis.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Manter ativo</AlertDialogCancel>
+              <AlertDialogAction onClick={() => toArchive && archive(toArchive)}>
+                Arquivar projeto
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         {toDuplicate && (
           <DuplicateDialog
             key={toDuplicate.id}
