@@ -121,6 +121,7 @@ func (s *server) startSession(c *echo.Context, userID int64) error {
 		Path:     "/",
 		Expires:  expires,
 		HttpOnly: true,
+		Secure:   c.Scheme() == "https",
 		SameSite: http.SameSiteLaxMode,
 	})
 	return nil
@@ -170,7 +171,7 @@ func (s *server) logout(c *echo.Context) error {
 			return err
 		}
 	}
-	c.SetCookie(&http.Cookie{Name: sessionCookie, Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteLaxMode})
+	c.SetCookie(&http.Cookie{Name: sessionCookie, Path: "/", MaxAge: -1, HttpOnly: true, Secure: c.Scheme() == "https", SameSite: http.SameSiteLaxMode})
 	return c.NoContent(http.StatusNoContent)
 }
 
