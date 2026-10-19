@@ -158,3 +158,43 @@ func TestProjectEventsListNewestFirstOwnerScoped(t *testing.T) {
 		t.Errorf("unknown project = %d", rec.Code)
 	}
 }
+
+func TestPortalEventsExposeSharedOnlyThroughClientDTO(t *testing.T) {
+	e := newServer(t)
+	a := signedUp(t, e)
+	path, l := finalizedShare(t, e, a)
+	portal := "/api/portal/" + l.Token
+	send(e, http.MethodPost, portal+"/change", map[string]string{"message": "Trocar prazo"}, nil)
+
+	rec := get(e, portal+"/events")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("portal events = %d %s", rec.Code, rec.Body)
+	}
+	var got []map[string]any
+	decode(t, rec, &got)
+	if len(got) != 2 || got[0]["kind"] != "change_requested" || got[1]["kind"] != "version_shared" {
+		t.Fatalf("events = %v", got)
+	}
+	for _, ev := range got {
+		keys := make([]string, 0, len(ev))
+		for k := range ev {
+			keys = append(keys, k)
+		}
+		slices.Sort(keys)
+		if want := []string{"actor", "actorName", "createdAt", "kind", "message", "number"}; !slices.Equal(keys, want) {
+			t.Errorf("keys = %v, want %v", keys, want)
+		}
+	}
+	if got[0]["actor"] != "client" || got[0]["actorName"] != "Ana" || got[0]["message"] != "Trocar prazo" || got[1]["actor"] != "pro" {
+		t.Errorf("events = %v", got)
+	}
+	for _, internal := range []string{"project_created", "contract_finalized", "archived", "readAt", "read_at"} {
+		if strings.Contains(rec.Body.String(), internal) {
+			t.Errorf("body exposes %s: %s", internal, rec.Body)
+		}
+	}
+
+	assertLinkInvalid(t, get(e, "/api/portal/desconhecido/events"))
+	send(e, http.MethodPost, path+"/archive", nil, a)
+	assertLinkInvalid(t, get(e, portal+"/events"))
+}

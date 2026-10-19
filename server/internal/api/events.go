@@ -95,3 +95,48 @@ func (s *server) listProjectEvents(c *echo.Context) error {
 	}
 	return c.JSON(http.StatusOK, list)
 }
+
+type portalEvent struct {
+	Kind      eventKind `json:"kind"`
+	Actor     string    `json:"actor"`
+	ActorName string    `json:"actorName"`
+	Number    int       `json:"number"`
+	Message   string    `json:"message"`
+	CreatedAt string    `json:"createdAt"`
+}
+
+func (s *server) listPortalEvents(c *echo.Context) error {
+	ctx := c.Request().Context()
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT e.kind, e.actor, e.actor_name, e.number, e.message, e.created_at
+		FROM project_events e JOIN share_links l ON l.project_id = e.project_id JOIN projects p ON p.id = e.project_id
+		WHERE l.token = ? AND p.archived_at IS NULL AND e.shared = 1 ORDER BY e.id DESC`, c.Param("token"))
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	list := []portalEvent{}
+	for rows.Next() {
+		var ev portalEvent
+		if err := rows.Scan(&ev.Kind, &ev.Actor, &ev.ActorName, &ev.Number, &ev.Message, &ev.CreatedAt); err != nil {
+			return err
+		}
+		list = append(list, ev)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if len(list) == 0 {
+		var valid bool
+		err := s.db.QueryRowContext(ctx,
+			`SELECT EXISTS (SELECT 1 FROM share_links l JOIN projects p ON p.id = l.project_id WHERE l.token = ? AND p.archived_at IS NULL)`,
+			c.Param("token")).Scan(&valid)
+		if err != nil {
+			return err
+		}
+		if !valid {
+			return linkInvalid(c)
+		}
+	}
+	return c.JSON(http.StatusOK, list)
+}

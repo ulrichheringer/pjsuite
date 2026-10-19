@@ -76,6 +76,7 @@ func New(db *sql.DB, files storage.Store) *echo.Echo {
 	g.POST("/projects/:id/share/regenerate", s.writableProject(s.regenerateShare), s.requireAuth)
 	g.GET("/projects/:id/share", s.getShare, s.requireAuth)
 	g.GET("/portal/:token", s.getPortal)
+	g.GET("/portal/:token/events", s.listPortalEvents)
 	g.POST("/portal/:token/change", s.postChange, bodyLimit)
 	g.POST("/portal/:token/refuse", s.postRefuse, bodyLimit)
 	g.POST("/portal/:token/sign", s.postSign, bodyLimit)
