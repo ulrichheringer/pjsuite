@@ -4,8 +4,22 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
+	"slices"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/labstack/echo/v5"
+)
+
+const (
+	maxPriceCents      = 1_000_000_000
+	maxPayments        = 12
+	maxPaymentDueRunes = 200
+)
+
+var (
+	paymentKinds    = []string{"entrada", "parcela", "saldo", "unico"}
+	paymentTriggers = []string{"assinatura", "data", "etapa", "antes_entrega", "apos_aprovacao"}
 )
 
 type payment struct {
@@ -66,4 +80,57 @@ func (s *server) listPayments(c *echo.Context) error {
 		return err
 	}
 	return c.JSON(http.StatusOK, plan)
+}
+
+func (in paymentPlan) validate() fieldErrors {
+	errs := fieldErrors{}
+	if in.PriceCents < 0 || in.PriceCents > maxPriceCents {
+		errs["priceCents"] = "Informe um valor entre R$ 0 e R$ 10.000.000."
+	}
+	total := 0
+	for _, pay := range in.Payments {
+		total += pay.Percent
+		switch {
+		case !slices.Contains(paymentKinds, pay.Kind), !slices.Contains(paymentTriggers, pay.Trigger):
+			errs["payments"] = "Escolha o tipo e a cobrança de cada pagamento."
+		case pay.Percent < 0 || pay.Percent > 100 || pay.Percent%5 != 0:
+			errs["payments"] = "Use percentuais de 0 a 100, de 5 em 5."
+		case utf8.RuneCountInString(pay.Due) > maxPaymentDueRunes:
+			errs["payments"] = "Use até 200 caracteres na data ou condição."
+		}
+	}
+	switch {
+	case errs["payments"] != "":
+	case len(in.Payments) > maxPayments:
+		errs["payments"] = "Use até 12 pagamentos."
+	case total > 100:
+		errs["payments"] = "A soma dos percentuais passa de 100%."
+	}
+	return errs
+}
+
+func (s *server) putPayments(c *echo.Context, p project) error {
+	var in paymentPlan
+	if err := c.Bind(&in); err != nil {
+		return echo.ErrBadRequest
+	}
+	for i := range in.Payments {
+		in.Payments[i].Due = strings.TrimSpace(in.Payments[i].Due)
+	}
+	if errs := in.validate(); len(errs) > 0 {
+		return invalid(c, http.StatusBadRequest, errs)
+	}
+	err := s.inTx(c, func(ctx context.Context, tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, `UPDATE projects SET price_cents = ? WHERE id = ?`, in.PriceCents, p.ID); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM payments WHERE project_id = ?`, p.ID); err != nil {
+			return err
+		}
+		return insertPayments(ctx, tx, p.ID, in.Payments)
+	})
+	if err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
 }
