@@ -44,6 +44,14 @@ type stageInput struct {
 	Tasks       []string `json:"tasks"`
 }
 
+func (st stage) input() stageInput {
+	in := stageInput{Name: st.Name, TimingKind: st.TimingKind, Timing: st.Timing, Deliverable: st.Deliverable, Visible: st.Visible}
+	for _, t := range st.Tasks {
+		in.Tasks = append(in.Tasks, t.Title)
+	}
+	return in
+}
+
 func (in *stageInput) normalize() {
 	in.Name = strings.TrimSpace(in.Name)
 	in.Timing = strings.TrimSpace(in.Timing)

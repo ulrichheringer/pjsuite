@@ -124,8 +124,8 @@ func (s *server) createProject(c *echo.Context) error {
 func (s *server) insertProject(c *echo.Context, p project, populate func(ctx context.Context, tx *sql.Tx, projectID int64) error) error {
 	err := s.inTx(c, func(ctx context.Context, tx *sql.Tx) error {
 		err := tx.QueryRowContext(ctx,
-			`INSERT INTO projects (user_id, client_id, name, area, reference, goal, structure) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`,
-			userIDOf(c), p.ClientID, p.Name, p.Area, p.Reference, p.Goal, p.Structure).Scan(&p.ID)
+			`INSERT INTO projects (user_id, client_id, name, area, reference, goal, structure, scope, outcome, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+			userIDOf(c), p.ClientID, p.Name, p.Area, p.Reference, p.Goal, p.Structure, p.Scope, p.Outcome, p.Notes).Scan(&p.ID)
 		if err != nil || populate == nil {
 			return err
 		}
@@ -217,7 +217,10 @@ func (s *server) duplicateProject(c *echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return echo.ErrBadRequest
 	}
-	p := project{ClientID: req.ClientID, Name: strings.TrimSpace(req.Name), Area: src.Area, Goal: src.Goal, Structure: src.Structure}
+	p := project{
+		ClientID: req.ClientID, Name: strings.TrimSpace(req.Name), Area: src.Area, Goal: src.Goal, Structure: src.Structure,
+		Scope: src.Scope, Outcome: src.Outcome, Notes: src.Notes,
+	}
 	if p.ClientID == 0 {
 		p.ClientID = src.ClientID
 	}
@@ -234,5 +237,16 @@ func (s *server) duplicateProject(c *echo.Context) error {
 	if len(errs) > 0 {
 		return invalid(c, http.StatusBadRequest, errs)
 	}
-	return s.insertProject(c, p, nil)
+	srcStages, err := s.loadStages(c.Request().Context(), src.ID)
+	if err != nil {
+		return err
+	}
+	return s.insertProject(c, p, func(ctx context.Context, tx *sql.Tx, projectID int64) error {
+		for _, st := range srcStages {
+			if _, err := insertStage(ctx, tx, projectID, st.input()); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
