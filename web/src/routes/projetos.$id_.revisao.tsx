@@ -67,7 +67,8 @@ function RevisionPage() {
     const outcome = await reviseContract(id, note);
     setPending(false);
     if (outcome.kind === "unauthorized") return navigate({ to: "/entrar" });
-    if (outcome.kind === "ok") return navigate({ to: "/projetos/$id/compartilhar", params: { id } });
+    if (outcome.kind === "ok")
+      return navigate({ to: "/projetos/$id/compartilhar", params: { id } });
     if (outcome.kind === "invalid" && outcome.status === 400) return setErrors(outcome.errors);
     setErrors({});
     setProblem(true);

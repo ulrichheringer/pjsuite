@@ -112,10 +112,17 @@ function SharePage() {
               <Copy />
               Copiar link
             </Button>
-            <Button variant="outline" disabled={pending} onClick={() => generate(regenerateShare)}>
-              <RefreshCw />
-              Gerar novo link
-            </Button>
+            {project.status !== "signed" && (
+              <Button
+                variant="outline"
+                disabled={pending}
+                onClick={() => generate(regenerateShare)}
+              >
+                <RefreshCw />
+                Gerar novo link
+              </Button>
+            )}
+            {project.status === "signed" && <Banner title="Contrato assinado." tone="success" />}
             {copied === "done" && <Banner title="Link copiado." tone="success" />}
             {copied === "failed" && (
               <Banner title="Não foi possível copiar o link." tone="danger">
@@ -136,6 +143,13 @@ function SharePage() {
               <Banner title={requestTitles[share.request.kind]} tone="warning">
                 {share.request.message}
               </Banner>
+            )}
+            {project.status === "changes_requested" && (
+              <Button asChild>
+                <Link to="/projetos/$id/revisao" params={{ id }}>
+                  Ajustar e reenviar
+                </Link>
+              </Button>
             )}
           </section>
         ) : (

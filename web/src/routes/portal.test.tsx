@@ -186,7 +186,8 @@ test("the sign screen posts the signature and shows the receipt", async () => {
     signedAt: "2026-10-18T12:00:00Z",
   };
   const spy = portalRoutes("viewed", (path, init) => {
-    if (path === "/api/portal/TOK/sign" && init?.method === "POST") return jsonResponse(200, receipt);
+    if (path === "/api/portal/TOK/sign" && init?.method === "POST")
+      return jsonResponse(200, receipt);
   });
   renderAt("/p/TOK/assinar");
 

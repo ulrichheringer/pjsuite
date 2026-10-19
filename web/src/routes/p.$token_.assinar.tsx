@@ -57,36 +57,22 @@ function SignForm({ token, portal }: { token: string; portal: Portal }) {
   }
 
   return (
-    <>
-      <div className="contract-layout">
-        <ContractPaper view={portal.content} version={portal.version} />
-        <form className="surface contract-aside" onSubmit={submit}>
-          <h1>Assinar versão {portal.version}</h1>
-          {failure !== "none" && <Banner title={failureTitles[failure]} tone="danger" />}
-          <Field
-            label="Nome completo"
-            required
-            value={name}
-            error={errors.name}
-            onChange={setName}
-          />
-          <Field
-            label="E-mail"
-            required
-            value={email}
-            error={errors.email}
-            onChange={setEmail}
-          />
-          <label className="check-label">
-            <Checkbox checked={consent} onCheckedChange={(v) => setConsent(v === true)} />
-            Li e concordo com esta versão do contrato.
-          </label>
-          {errors.consent && <p className="field-error">{errors.consent}</p>}
-          <Button type="submit" disabled={pending}>
-            {pending ? "Assinando…" : "Assinar"}
-          </Button>
-        </form>
-      </div>
-    </>
+    <div className="contract-layout">
+      <ContractPaper view={portal.content} version={portal.version} />
+      <form className="surface contract-aside" onSubmit={submit}>
+        <h1>Assinar versão {portal.version}</h1>
+        {failure !== "none" && <Banner title={failureTitles[failure]} tone="danger" />}
+        <Field label="Nome completo" required value={name} error={errors.name} onChange={setName} />
+        <Field label="E-mail" required value={email} error={errors.email} onChange={setEmail} />
+        <label className="check-label">
+          <Checkbox checked={consent} onCheckedChange={(v) => setConsent(v === true)} />
+          Li e concordo com esta versão do contrato.
+        </label>
+        {errors.consent && <p className="field-error">{errors.consent}</p>}
+        <Button type="submit" disabled={pending}>
+          {pending ? "Assinando…" : "Assinar"}
+        </Button>
+      </form>
+    </div>
   );
 }
