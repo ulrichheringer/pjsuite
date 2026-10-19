@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ChevronDown, ChevronUp, EyeOff, Pencil, Plus } from "lucide-react";
 import {
   createStage,
@@ -17,14 +17,13 @@ import {
   type Stage,
   type StageInput,
 } from "@/api";
+import { Stepper } from "@/stepper";
 import { StageDialog } from "@/stage-dialog";
 import { PaymentPlan } from "@/payment-plan";
 import { Attachments } from "@/attachments";
 import { Badge, Banner, Button, Field, Loading, Section } from "@/ui";
 
 export const Route = createFileRoute("/projetos/$id_/montagem")({ component: BuilderPage });
-
-const steps = ["01 Montagem", "02 Visibilidade", "03 Contrato", "04 Compartilhar"];
 
 function StageRow({
   stage,
@@ -199,23 +198,7 @@ function BuilderPage() {
           </div>
           <Badge>{project.status === "final" ? "Finalizado" : "Rascunho"}</Badge>
         </header>
-        <div className="stepper">
-          {steps.map((step, i) =>
-            i === 0 ? (
-              <strong key={step}>{step}</strong>
-            ) : i === 1 ? (
-              <Link key={step} to="/projetos/$id/visibilidade" params={{ id }}>
-                {step}
-              </Link>
-            ) : i === 2 ? (
-              <Link key={step} to="/projetos/$id/contrato" params={{ id }}>
-                {step}
-              </Link>
-            ) : (
-              <span key={step}>{step}</span>
-            ),
-          )}
-        </div>
+        <Stepper id={id} current="montagem" />
         {problem && (
           <Banner title={problem} tone="danger">
             Seus dados foram mantidos. Confira os campos e tente novamente.

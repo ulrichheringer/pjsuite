@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
-import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ArrowRight, Check, Circle } from "lucide-react";
 import { finalizeContract, getClientView, getProject, type ClientView } from "@/api";
 import { ContractPaper } from "@/contract-paper";
+import { Stepper } from "@/stepper";
 import { Badge, Banner, Button, Loading } from "@/ui";
 
 export const Route = createFileRoute("/projetos/$id_/contrato/")({ component: ContractPage });
-
-const steps = ["01 Montagem", "02 Visibilidade", "03 Contrato", "04 Compartilhar"];
 
 function checklist(view: ClientView) {
   return [
@@ -80,23 +79,7 @@ function ContractPage() {
           </div>
           <Badge>Rascunho</Badge>
         </header>
-        <div className="stepper">
-          {steps.map((step, i) =>
-            i === 0 ? (
-              <Link key={step} to="/projetos/$id/montagem" params={{ id }}>
-                {step}
-              </Link>
-            ) : i === 1 ? (
-              <Link key={step} to="/projetos/$id/visibilidade" params={{ id }}>
-                {step}
-              </Link>
-            ) : i === 2 ? (
-              <strong key={step}>{step}</strong>
-            ) : (
-              <span key={step}>{step}</span>
-            ),
-          )}
-        </div>
+        <Stepper id={id} current="contrato" />
         {problem && (
           <Banner title="Não foi possível finalizar o projeto." tone="danger">
             Nada foi alterado. Tente novamente.

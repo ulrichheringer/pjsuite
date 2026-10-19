@@ -15,11 +15,10 @@ import {
 } from "@/api";
 import { ClientPreview } from "@/client-preview";
 import { Switch } from "@/components/ui/switch";
+import { Stepper } from "@/stepper";
 import { Badge, Banner, Button, Loading } from "@/ui";
 
 export const Route = createFileRoute("/projetos/$id_/visibilidade")({ component: VisibilityPage });
-
-const steps = ["01 Montagem", "02 Visibilidade", "03 Contrato", "04 Compartilhar"];
 
 function VisibilityPage() {
   const { id } = Route.useParams();
@@ -88,23 +87,7 @@ function VisibilityPage() {
           </div>
           <Badge>{project.status === "final" ? "Finalizado" : "Rascunho"}</Badge>
         </header>
-        <div className="stepper">
-          {steps.map((step, i) =>
-            i === 0 ? (
-              <Link key={step} to="/projetos/$id/montagem" params={{ id }}>
-                {step}
-              </Link>
-            ) : i === 1 ? (
-              <strong key={step}>{step}</strong>
-            ) : i === 2 ? (
-              <Link key={step} to="/projetos/$id/contrato" params={{ id }}>
-                {step}
-              </Link>
-            ) : (
-              <span key={step}>{step}</span>
-            ),
-          )}
-        </div>
+        <Stepper id={id} current="visibilidade" />
         {problem && <Banner title={problem} tone="danger" />}
         <div className="visibility-layout">
           <section className="surface visibility-controls">
