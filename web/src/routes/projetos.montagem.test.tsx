@@ -46,6 +46,14 @@ const stages = [
   }),
 ];
 
+const plan = {
+  priceCents: 150000,
+  payments: [
+    { kind: "entrada", percent: 30, trigger: "assinatura", due: "Na assinatura do contrato" },
+    { kind: "saldo", percent: 50, trigger: "antes_entrega", due: "" },
+  ],
+};
+
 const builderRoutes = (
   extra?: (path: string, init?: RequestInit) => Response | undefined,
   served: () => unknown = () => stages,
@@ -53,6 +61,7 @@ const builderRoutes = (
   mockFetch((path, init) => {
     if (path === "/api/projects/5" && !init?.method) return jsonResponse(200, project);
     if (path === "/api/projects/5/stages" && !init?.method) return jsonResponse(200, served());
+    if (path === "/api/projects/5/payments" && !init?.method) return jsonResponse(200, plan);
     return extra?.(path, init) ?? jsonResponse(500);
   });
 
@@ -333,4 +342,33 @@ test("an archived project cannot change its stages", async () => {
   expect(screen.queryByRole("button", { name: /Adicionar nova etapa/ })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Editar Descoberta" })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: /Mover/ })).not.toBeInTheDocument();
+});
+
+test("payment plan shows the total, computed values and the distributed balance", async () => {
+  builderRoutes();
+  renderAt("/projetos/5/montagem");
+  const user = userEvent.setup();
+  expect(await screen.findByLabelText("Valor total do projeto (R$)")).toHaveValue("1500");
+  const cards = await screen.findAllByRole("article");
+  expect(cards).toHaveLength(2);
+  expect(cards[0]).toHaveTextContent(/R\$\s450,00/);
+  expect(cards[1]).toHaveTextContent(/R\$\s750,00/);
+  expect(screen.getByText("80% distribuído")).toBeInTheDocument();
+  expect(screen.getByText("Faltam 20% para fechar o valor")).toBeInTheDocument();
+
+  const slider = within(cards[0]!).getByRole("slider");
+  slider.focus();
+  await user.keyboard("{ArrowRight}");
+  expect(cards[0]).toHaveTextContent("35%");
+  expect(cards[0]).toHaveTextContent(/R\$\s525,00/);
+  expect(screen.getByText("85% distribuído")).toBeInTheDocument();
+
+  await user.clear(screen.getByLabelText("Valor total do projeto (R$)"));
+  await user.type(screen.getByLabelText("Valor total do projeto (R$)"), "2000");
+  expect(cards[0]).toHaveTextContent(/R\$\s700,00/);
+
+  await user.click(screen.getByRole("button", { name: "Adicionar pagamento" }));
+  expect(screen.getAllByRole("article")).toHaveLength(3);
+  await user.click(screen.getByRole("button", { name: "Remover Parcela intermediária" }));
+  expect(screen.getAllByRole("article")).toHaveLength(2);
 });

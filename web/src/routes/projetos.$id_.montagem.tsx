@@ -18,6 +18,7 @@ import {
   type StageInput,
 } from "@/api";
 import { StageDialog } from "@/stage-dialog";
+import { PaymentPlan } from "@/payment-plan";
 import { Badge, Banner, Button, Field, Loading } from "@/ui";
 
 export const Route = createFileRoute("/projetos/$id_/montagem")({ component: BuilderPage });
@@ -270,6 +271,7 @@ function BuilderPage() {
                 onChange={(outcome) => change({ outcome })}
               />
             </Section>
+            <PaymentPlan projectId={id} readOnly={project.archived} />
           </div>
           <aside className="editor-side">
             <Section label="Estrutura do projeto">
