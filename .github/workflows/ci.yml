@@ -1,0 +1,42 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - run: go install mvdan.cc/gofumpt@v0.9.2
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run check
+      - run: pnpm exec tsc --noEmit
+        working-directory: web
+      - run: pnpm run test
+      - run: pnpm run build
+      - run: deploy/smoke.sh
+      - name: install litestream
+        run: |
+          curl -sfL https://github.com/benbjohnson/litestream/releases/download/v0.5.17/litestream-0.5.17-linux-x86_64.tar.gz | sudo tar -xz -C /usr/local/bin litestream
+      - run: deploy/backup-check.sh
+      - name: install caddy
+        run: |
+          curl -sfL "https://caddyserver.com/api/download?os=linux&arch=amd64" -o caddy
+          sudo install caddy /usr/local/bin/caddy
+      - run: caddy validate --config deploy/Caddyfile --adapter caddyfile
+        env:
+          PJSUITE_DOMAIN: pjsuite.example.com

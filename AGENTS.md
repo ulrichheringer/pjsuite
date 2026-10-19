@@ -9,7 +9,8 @@ All from repo root (pnpm workspaces `web`, `server`; tasks run via `vp run`; `pn
 - dev: `pnpm run dev` (web :5173 proxies `/api` to server :8080; env `PJSUITE_ADDR`, `PJSUITE_DB` default `pjsuite.db`; attachments go to `PJSUITE_FILES` default `files/`, or R2 when all of `PJSUITE_R2_ACCOUNT_ID`, `PJSUITE_R2_ACCESS_KEY_ID`, `PJSUITE_R2_SECRET_ACCESS_KEY`, `PJSUITE_R2_BUCKET` are set; partial R2 config fails startup)
 - check: `pnpm run check` (oxfmt + oxlint + gofumpt + go vet); typecheck: `cd web && pnpm exec tsc --noEmit`
 - test: `pnpm run test` (vitest in web, `go test` in server); single Go test: `cd server && go test ./internal/... -run Name`
-- build: `pnpm run build`
+- build: `pnpm run build` (web builds into `server/internal/webui/dist`, then `server/bin/pjsuite` embeds it; the committed `dist/index.html` is a placeholder — don't commit the built one)
+- smoke: `deploy/smoke.sh [binary]`; backup round trip: `deploy/backup-check.sh [binary]` (needs `litestream`, `sqlite3`); deploy runbook `deploy/README.md`; CI `.github/workflows/ci.yml`
 
 ## Layout
 
@@ -18,7 +19,8 @@ All from repo root (pnpm workspaces `web`, `server`; tasks run via `vp run`; `pn
 - `web/src/globals.css` tokens/foundations, `product.css` component classes
 - `web/src/components/ui/` vendored shadcn primitives (excluded from fmt/lint; do not restyle in place)
 - `web/public/brand`, `web/public/tokens.json` brand assets and tokens
-- `server/cmd/pjsuite` entrypoint; `server/internal/api` Echo routes under `/api`; `server/internal/store` SQLite open + goose migrate; `server/internal/storage` file store interface (Dir, R2, Memory); `server/migrations` SQL
+- `server/cmd/pjsuite` entrypoint; `server/internal/api` Echo routes under `/api`, plus the SPA fallback from `server/internal/webui`; `server/internal/store` SQLite open + goose migrate; `server/internal/storage` file store interface (Dir, R2, Memory; `Signer` for R2 presigned downloads, 302 from `streamObject`); `server/migrations` SQL
+- `deploy/` Caddyfile, systemd units, litestream.yml, env example, smoke/backup scripts, runbook
 - `design/` DESIGN.md, SCREEN-SPECS.md, `prototype/` reference code (never import)
 
 ## Conventions

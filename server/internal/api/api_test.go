@@ -31,6 +31,13 @@ func newServerDB(t *testing.T) (*echo.Echo, *sql.DB) {
 
 func newServerAll(t *testing.T) (*echo.Echo, *sql.DB, *storage.Memory) {
 	t.Helper()
+	files := storage.NewMemory()
+	e, db := newServerWith(t, files)
+	return e, db, files
+}
+
+func newServerWith(t *testing.T, files storage.Store) (*echo.Echo, *sql.DB) {
+	t.Helper()
 	db, err := store.Open(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -39,8 +46,7 @@ func newServerAll(t *testing.T) (*echo.Echo, *sql.DB, *storage.Memory) {
 	if err := store.Migrate(t.Context(), db); err != nil {
 		t.Fatal(err)
 	}
-	files := storage.NewMemory()
-	return api.New(db, files), db, files
+	return api.New(db, files), db
 }
 
 func TestHealth(t *testing.T) {
