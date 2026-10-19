@@ -1,0 +1,31 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - run: go install mvdan.cc/gofumpt@latest
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run check
+      - run: pnpm exec tsc --noEmit
+        working-directory: web
+      - run: pnpm run test
+      - run: pnpm run build
+      - run: deploy/smoke.sh
