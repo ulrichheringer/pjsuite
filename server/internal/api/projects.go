@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"net/http"
@@ -114,13 +115,19 @@ func (s *server) createProject(c *echo.Context) error {
 	if len(errs) > 0 {
 		return invalid(c, http.StatusBadRequest, errs)
 	}
-	return s.insertProject(c, p)
+	return s.insertProject(c, p, seedStages(p.Structure))
 }
 
-func (s *server) insertProject(c *echo.Context, p project) error {
-	err := s.db.QueryRowContext(c.Request().Context(),
-		`INSERT INTO projects (user_id, client_id, name, area, reference, goal, structure) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`,
-		userIDOf(c), p.ClientID, p.Name, p.Area, p.Reference, p.Goal, p.Structure).Scan(&p.ID)
+func (s *server) insertProject(c *echo.Context, p project, populate func(ctx context.Context, tx *sql.Tx, projectID int64) error) error {
+	err := s.inTx(c, func(ctx context.Context, tx *sql.Tx) error {
+		err := tx.QueryRowContext(ctx,
+			`INSERT INTO projects (user_id, client_id, name, area, reference, goal, structure) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+			userIDOf(c), p.ClientID, p.Name, p.Area, p.Reference, p.Goal, p.Structure).Scan(&p.ID)
+		if err != nil || populate == nil {
+			return err
+		}
+		return populate(ctx, tx, p.ID)
+	})
 	if err != nil {
 		return err
 	}
@@ -224,5 +231,5 @@ func (s *server) duplicateProject(c *echo.Context) error {
 	if len(errs) > 0 {
 		return invalid(c, http.StatusBadRequest, errs)
 	}
-	return s.insertProject(c, p)
+	return s.insertProject(c, p, nil)
 }

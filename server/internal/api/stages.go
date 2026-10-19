@@ -307,3 +307,24 @@ func (s *server) putStageOrder(c *echo.Context, p project) error {
 	}
 	return c.NoContent(http.StatusNoContent)
 }
+
+var starterStages = []stageInput{
+	{Name: "Descoberta e alinhamento", TimingKind: "deadline", Timing: "Até 05 out", Tasks: []string{"Reunião de kickoff", "Confirmar objetivos e referências"}, Deliverable: "Briefing aprovado", Visible: true},
+	{Name: "Execução", TimingKind: "period", Timing: "12 out · 14h às 22h", Tasks: []string{"Realizar o trabalho previsto", "Registrar decisões importantes"}, Deliverable: "Material bruto organizado", Visible: true},
+	{Name: "Produção e refinamento", TimingKind: "relative", Timing: "Até 20 dias após a execução", Tasks: []string{"Preparar primeira versão", "Revisar qualidade da entrega"}, Deliverable: "Versão para revisão", Visible: true},
+	{Name: "Entrega final", TimingKind: "deadline", Timing: "Até 12 nov", Tasks: []string{"Publicar arquivos finais"}, Deliverable: "Entrega final aprovada", Visible: true},
+}
+
+func seedStages(structure string) func(ctx context.Context, tx *sql.Tx, projectID int64) error {
+	if structure == "blank" {
+		return nil
+	}
+	return func(ctx context.Context, tx *sql.Tx, projectID int64) error {
+		for _, in := range starterStages {
+			if _, err := insertStage(ctx, tx, projectID, in); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+}
