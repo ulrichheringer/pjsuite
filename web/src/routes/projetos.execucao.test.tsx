@@ -184,6 +184,57 @@ test("a failed task save shows the problem", async () => {
   expect(await screen.findByText("Não foi possível salvar a alteração.")).toBeVisible();
 });
 
+test("a failed task add keeps the typed title", async () => {
+  executionRoutes((path, init) =>
+    path === "/api/projects/5/stages/1/tasks" && init?.method === "POST"
+      ? jsonResponse(500)
+      : undefined,
+  );
+  renderAt("/projetos/5/execucao");
+
+  const first = await stageSection("Descoberta");
+  const input = first.getByLabelText("Nova tarefa em Descoberta");
+  await userEvent.type(input, "Revisar");
+  await userEvent.click(first.getByRole("button", { name: "Adicionar tarefa" }));
+
+  expect(await screen.findByText("Não foi possível adicionar a tarefa.")).toBeVisible();
+  expect(input).toHaveValue("Revisar");
+});
+
+test("a rejected file is still reported when a later file uploads fine", async () => {
+  executionRoutes((path, init) =>
+    path === "/api/projects/5/stages/2/files" && init?.method === "POST"
+      ? jsonResponse(201, {})
+      : undefined,
+  );
+  renderAt("/projetos/5/execucao");
+
+  const second = await stageSection("Entrega final");
+  await userEvent.upload(
+    second.getByLabelText(/Escolher arquivos/),
+    [new File(["x"], "notas.txt"), new File(["%PDF"], "entrega.pdf", { type: "application/pdf" })],
+    { applyAccept: false },
+  );
+
+  expect(await screen.findByText("Envie PDF, JPG, PNG ou ZIP.")).toBeVisible();
+});
+
+test("renaming a task saves the new title", async () => {
+  const spy = executionRoutes((path, init) =>
+    path === "/api/projects/5/tasks/10" && init?.method === "PUT" ? jsonResponse(204) : undefined,
+  );
+  renderAt("/projetos/5/execucao");
+
+  const first = await stageSection("Descoberta");
+  await userEvent.click(first.getByRole("button", { name: "Renomear tarefa Kickoff" }));
+  const input = first.getByLabelText("Novo nome da tarefa Kickoff");
+  await userEvent.clear(input);
+  await userEvent.type(input, "Reunião inicial{Enter}");
+
+  const call = spy.mock.calls.find(([path]) => path === "/api/projects/5/tasks/10")!;
+  expect(JSON.parse(String(call[1]?.body))).toEqual({ title: "Reunião inicial" });
+});
+
 const projectRoutes = (status: string) =>
   mockFetch((path) => {
     if (path === "/api/projects/5")

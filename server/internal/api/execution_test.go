@@ -2,6 +2,7 @@ package api_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"mime"
 	"net/http"
 	"strconv"
@@ -431,11 +432,15 @@ func TestExecutionPortalListsVisibleStageProgressWhenSigned(t *testing.T) {
 	rec := get(e, portal)
 	var got portalProgressJSON
 	decode(t, rec, &got)
+	var progress struct {
+		Progress json.RawMessage `json:"progress"`
+	}
+	decode(t, rec, &progress)
 	if len(got.Progress) != 1 || got.Progress[0].Name != "Etapa Aberta" || got.Progress[0].Status != "in_progress" {
 		t.Fatalf("progress = %+v", got.Progress)
 	}
 	for _, secret := range []string{"Etapa Oculta", "TAREFA-", "ENTREGA-OCULTA", "NOTA-SECRETA", "interno.pdf"} {
-		if strings.Contains(strings.SplitN(rec.Body.String(), `"progress"`, 2)[1], secret) {
+		if strings.Contains(string(progress.Progress), secret) {
 			t.Errorf("progress leaked %q: %s", secret, rec.Body)
 		}
 	}
@@ -458,7 +463,9 @@ func TestExecutionPortalOmitsProgressUnlessSignedAndStagesVisible(t *testing.T) 
 	if rec := send(e2, http.MethodPut, path+"/visibility", map[string]bool{"stages": false}, a2); rec.Code != http.StatusNoContent {
 		t.Fatalf("visibility = %d", rec.Code)
 	}
-	send(e2, http.MethodPost, path+"/contract", nil, a2)
+	if rec := send(e2, http.MethodPost, path+"/contract", nil, a2); rec.Code != http.StatusCreated {
+		t.Fatalf("contract = %d", rec.Code)
+	}
 	var l2 shareJSON
 	decode(t, send(e2, http.MethodPost, path+"/share", nil, a2), &l2)
 	if rec := send(e2, http.MethodPost, "/api/portal/"+l2.Token+"/sign", signBody(1), nil); rec.Code != http.StatusOK {

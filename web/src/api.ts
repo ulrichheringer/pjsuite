@@ -299,6 +299,8 @@ const stageStatusSchema = z.enum(["pending", "in_progress", "done"]);
 
 export type StageStatus = z.infer<typeof stageStatusSchema>;
 
+export const parseStageStatus = (value: string) => stageStatusSchema.safeParse(value).data;
+
 export const stageStatusLabels = {
   pending: "Pendente",
   in_progress: "Em execução",

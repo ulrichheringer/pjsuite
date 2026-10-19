@@ -9,11 +9,12 @@ import {
   setStageStatus,
   stageFileUrl,
   stageStatusLabels,
+  parseStageStatus,
   updateTask,
   uploadStageFile,
   type ExecutionStage,
+  type ExecutionTask,
   type Outcome,
-  type StageStatus,
 } from "@/api";
 import { fileMeta, precheck } from "@/attachments";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -23,7 +24,7 @@ import { Banner, Blank, Button, FileRow, Loading, UploadBox } from "@/ui";
 
 export const Route = createFileRoute("/projetos/$id_/execucao")({ component: ExecutionPage });
 
-type Run = (request: Promise<Outcome>, failure: string) => Promise<void>;
+type Run = (request: Promise<Outcome>, failure: string) => Promise<boolean>;
 
 function ExecutionPage() {
   const { id } = Route.useParams();
@@ -46,9 +47,14 @@ function ExecutionPage() {
   const run: Run = async (request, failure) => {
     setProblem(undefined);
     const outcome = await request;
-    if (outcome.kind === "unauthorized") return navigate({ to: "/entrar" });
-    if (outcome.kind !== "ok") setProblem(failure);
+    if (outcome.kind === "unauthorized") {
+      await navigate({ to: "/entrar" });
+      return false;
+    }
+    const ok = outcome.kind === "ok";
+    if (!ok) setProblem(failure);
     await refresh();
+    return ok;
   };
 
   return (
@@ -103,15 +109,16 @@ function StageCard({
 
   async function submitTask(event: FormEvent) {
     event.preventDefault();
-    await run(addTask(projectId, stage.id, title), "Não foi possível adicionar a tarefa.");
-    setTitle("");
+    if (await run(addTask(projectId, stage.id, title), "Não foi possível adicionar a tarefa."))
+      setTitle("");
   }
 
   async function upload(chosen: File[]) {
+    const rejections = new Set<string>();
     for (const file of chosen) {
       const rejection = precheck(file);
       if (rejection) {
-        onProblem(rejection);
+        rejections.add(rejection);
         continue;
       }
       await run(
@@ -119,6 +126,7 @@ function StageCard({
         `Não foi possível enviar ${file.name}.`,
       );
     }
+    if (rejections.size > 0) onProblem([...rejections].join(" "));
   }
 
   return (
@@ -128,12 +136,14 @@ function StageCard({
         <NativeSelect
           aria-label={`Status de ${stage.name}`}
           value={stage.status}
-          onChange={(event) =>
-            run(
-              setStageStatus(projectId, stage.id, event.target.value as StageStatus),
-              "Não foi possível salvar a alteração.",
-            )
-          }
+          onChange={(event) => {
+            const status = parseStageStatus(event.target.value);
+            if (status)
+              run(
+                setStageStatus(projectId, stage.id, status),
+                "Não foi possível salvar a alteração.",
+              );
+          }}
         >
           {Object.entries(stageStatusLabels).map(([value, label]) => (
             <NativeSelectOption key={value} value={value}>
@@ -146,28 +156,7 @@ function StageCard({
         <p>{[stage.timing, stage.deliverable].filter(Boolean).join(" · ")}</p>
       )}
       {stage.tasks.map((task) => (
-        <div key={task.id} className="check-label">
-          <Checkbox
-            aria-label={task.title}
-            checked={task.done}
-            onCheckedChange={(checked) =>
-              run(
-                updateTask(projectId, task.id, { done: checked === true }),
-                "Não foi possível salvar a alteração.",
-              )
-            }
-          />
-          <span>{task.title}</span>
-          <Button
-            variant="ghost"
-            aria-label={`Remover tarefa ${task.title}`}
-            onClick={() =>
-              run(deleteTask(projectId, task.id), "Não foi possível remover a tarefa.")
-            }
-          >
-            Remover
-          </Button>
-        </div>
+        <TaskRow key={task.id} projectId={projectId} task={task} run={run} />
       ))}
       <form className="check-label" onSubmit={submitTask}>
         <Input
@@ -197,5 +186,64 @@ function StageCard({
         />
       ))}
     </section>
+  );
+}
+
+function TaskRow({ projectId, task, run }: { projectId: string; task: ExecutionTask; run: Run }) {
+  const [title, setTitle] = useState<string>();
+
+  async function rename(event: FormEvent) {
+    event.preventDefault();
+    if (await run(updateTask(projectId, task.id, { title }), "Não foi possível renomear a tarefa."))
+      setTitle(undefined);
+  }
+
+  return (
+    <div className="check-label">
+      <Checkbox
+        aria-label={task.title}
+        checked={task.done}
+        onCheckedChange={(checked) =>
+          run(
+            updateTask(projectId, task.id, { done: checked === true }),
+            "Não foi possível salvar a alteração.",
+          )
+        }
+      />
+      {title === undefined ? (
+        <>
+          <span>{task.title}</span>
+          <Button
+            variant="ghost"
+            aria-label={`Renomear tarefa ${task.title}`}
+            onClick={() => setTitle(task.title)}
+          >
+            Renomear
+          </Button>
+        </>
+      ) : (
+        <form className="check-label" onSubmit={rename}>
+          <Input
+            aria-label={`Novo nome da tarefa ${task.title}`}
+            required
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+          />
+          <Button type="submit" variant="outline">
+            Salvar
+          </Button>
+          <Button type="button" variant="ghost" onClick={() => setTitle(undefined)}>
+            Cancelar
+          </Button>
+        </form>
+      )}
+      <Button
+        variant="ghost"
+        aria-label={`Remover tarefa ${task.title}`}
+        onClick={() => run(deleteTask(projectId, task.id), "Não foi possível remover a tarefa.")}
+      >
+        Remover
+      </Button>
+    </div>
   );
 }

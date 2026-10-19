@@ -44,12 +44,12 @@ func (s *server) loadStageFiles(ctx context.Context, projectID int64) (map[int64
 	defer rows.Close()
 	files := map[int64][]attachment{}
 	for rows.Next() {
-		var stageID int64
+		var sid int64
 		var f attachment
-		if err := rows.Scan(&stageID, &f.ID, &f.Name, &f.ContentType, &f.Size, &f.CreatedAt); err != nil {
+		if err := rows.Scan(&sid, &f.ID, &f.Name, &f.ContentType, &f.Size, &f.CreatedAt); err != nil {
 			return nil, err
 		}
-		files[stageID] = append(files[stageID], f)
+		files[sid] = append(files[sid], f)
 	}
 	return files, rows.Err()
 }
@@ -257,7 +257,7 @@ func (s *server) listStageFiles(c *echo.Context) error {
 }
 
 func (s *server) findStageFile(c *echo.Context, p project) (f attachment, key string, err error) {
-	stageID, err := s.requireStage(c, p)
+	sid, err := s.requireStage(c, p)
 	if err != nil {
 		return f, "", err
 	}
@@ -266,7 +266,7 @@ func (s *server) findStageFile(c *echo.Context, p project) (f attachment, key st
 		return f, "", echo.ErrNotFound
 	}
 	err = s.db.QueryRowContext(c.Request().Context(),
-		`SELECT id, key, name, content_type, size, created_at FROM stage_files WHERE id = ? AND stage_id = ?`, id, stageID).
+		`SELECT id, key, name, content_type, size, created_at FROM stage_files WHERE id = ? AND stage_id = ?`, id, sid).
 		Scan(&f.ID, &key, &f.Name, &f.ContentType, &f.Size, &f.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return f, "", echo.ErrNotFound
