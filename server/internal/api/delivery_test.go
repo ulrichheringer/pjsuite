@@ -2,7 +2,10 @@ package api_test
 
 import (
 	"net/http"
+	"strconv"
 	"testing"
+
+	"github.com/labstack/echo/v5"
 )
 
 func TestDeliveryDBRejectsDraftsUnlessSignedAndFreezesPublished(t *testing.T) {
@@ -50,5 +53,87 @@ func TestDeliveryDBRejectsDraftsUnlessSignedAndFreezesPublished(t *testing.T) {
 		if exec(q) == nil {
 			t.Errorf("%s succeeded on published delivery", q)
 		}
+	}
+}
+
+type deliveryJSON struct {
+	Number      *int             `json:"number"`
+	Title       string           `json:"title"`
+	Message     string           `json:"message"`
+	PublishedAt *string          `json:"publishedAt"`
+	Files       []attachmentJSON `json:"files"`
+}
+
+type deliveriesJSON struct {
+	Draft     *deliveryJSON  `json:"draft"`
+	Published []deliveryJSON `json:"published"`
+}
+
+func deliveriesOf(t *testing.T, e *echo.Echo, path string, a *http.Cookie) deliveriesJSON {
+	t.Helper()
+	rec := get(e, path+"/deliveries", a)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("deliveries = %d %s", rec.Code, rec.Body)
+	}
+	var got deliveriesJSON
+	decode(t, rec, &got)
+	return got
+}
+
+func TestDeliveryDraftFilesUploadListDelete(t *testing.T) {
+	e, files := newAttachmentServer(t)
+	a := signedUp(t, e)
+	path, _ := signedProject(t, e, a)
+	url := path + "/deliveries/draft/files"
+
+	if got := deliveriesOf(t, e, path, a); got.Draft != nil || len(got.Published) != 0 {
+		t.Fatalf("empty = %+v", got)
+	}
+	var first, second attachmentJSON
+	decode(t, uploadTo(e, url, "file", "briefing.pdf", attachmentSamples["briefing.pdf"], a), &first)
+	rec := uploadTo(e, url, "file", "logo.png", attachmentSamples["logo.png"], a)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("upload = %d %s", rec.Code, rec.Body)
+	}
+	decode(t, rec, &second)
+	got := deliveriesOf(t, e, path, a)
+	if got.Draft == nil || len(got.Draft.Files) != 2 || got.Draft.Files[0] != first || got.Draft.Files[1] != second || files.Len() != 3 {
+		t.Fatalf("draft = %+v, objects = %d", got.Draft, files.Len())
+	}
+	if rec := send(e, http.MethodDelete, url+"/"+strconv.Itoa(first.ID), nil, a); rec.Code != http.StatusNoContent {
+		t.Fatalf("delete = %d", rec.Code)
+	}
+	if got := deliveriesOf(t, e, path, a); len(got.Draft.Files) != 1 || files.Len() != 2 {
+		t.Fatalf("after delete = %+v, objects = %d", got.Draft, files.Len())
+	}
+	if rec := send(e, http.MethodDelete, url+"/999", nil, a); rec.Code != http.StatusNotFound {
+		t.Errorf("delete unknown = %d", rec.Code)
+	}
+}
+
+func TestDeliveryRejectsOtherUserUnsignedAndBadFile(t *testing.T) {
+	e, files := newAttachmentServer(t)
+	a := signedUp(t, e)
+	path, _ := signedProject(t, e, a)
+	url := path + "/deliveries/draft/files"
+	b := signedUpAs(t, e, "bruno@example.com")
+
+	if rec := uploadTo(e, url, "file", "briefing.pdf", attachmentSamples["briefing.pdf"], b); rec.Code != http.StatusNotFound {
+		t.Errorf("other user upload = %d", rec.Code)
+	}
+	if rec := get(e, path+"/deliveries", b); rec.Code != http.StatusNotFound {
+		t.Errorf("other user list = %d", rec.Code)
+	}
+	if rec := uploadTo(e, url, "file", "run.exe", []byte("MZ"), a); rec.Code != http.StatusBadRequest {
+		t.Errorf("bad type = %d", rec.Code)
+	}
+	if got := deliveriesOf(t, e, path, a); got.Draft != nil && len(got.Draft.Files) != 0 || files.Len() != 1 {
+		t.Errorf("rejected uploads left %+v, objects = %d", got.Draft, files.Len())
+	}
+
+	unsigned := filledProject(t, e, a)
+	rec := uploadTo(e, unsigned+"/deliveries/draft/files", "file", "briefing.pdf", attachmentSamples["briefing.pdf"], a)
+	if rec.Code != http.StatusConflict {
+		t.Errorf("unsigned upload = %d", rec.Code)
 	}
 }
