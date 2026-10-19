@@ -72,5 +72,6 @@ func New(db *sql.DB, files storage.Store) *echo.Echo {
 	g.POST("/projects/:id/share", s.writableProject(s.createShare), s.requireAuth)
 	g.POST("/projects/:id/share/regenerate", s.writableProject(s.regenerateShare), s.requireAuth)
 	g.GET("/projects/:id/share", s.getShare, s.requireAuth)
+	g.GET("/portal/:token", s.getPortal)
 	return e
 }
