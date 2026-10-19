@@ -1,0 +1,10 @@
+dbs:
+  - path: ${PJSUITE_DB}
+    replica:
+      type: s3
+      bucket: ${PJSUITE_BACKUP_BUCKET}
+      path: ${PJSUITE_BACKUP_PATH}
+      endpoint: https://${PJSUITE_R2_ACCOUNT_ID}.r2.cloudflarestorage.com
+      region: auto
+      access-key-id: ${PJSUITE_R2_ACCESS_KEY_ID}
+      secret-access-key: ${PJSUITE_R2_SECRET_ACCESS_KEY}

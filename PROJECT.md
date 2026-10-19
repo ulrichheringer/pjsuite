@@ -40,7 +40,7 @@ Social login, plans/billing, marketplace, templates marketplace, automated email
 - Files: Cloudflare R2 via its S3-compatible API, object key + metadata in DB, 20 MB limit, pdf/jpg/png/zip — matches the prototype's upload box; client downloads go through the API (token-checked, short-lived signed URLs), never public buckets.
 - Contract PDF: browser print of an HTML contract sheet — no PDF engine needed.
 - Dev: Vite proxies `/api` to :8080 — frontend HMR with the real API.
-- Deploy: one VM running the Go binary (serves `web/dist` and `/api`) behind a TLS reverse proxy (Caddy), SQLite on the VM disk, files on R2 — one box, no orchestration; matches SQLite's single-writer model [INFERENCE: proxy choice is my default].
+- Deploy: one VM running the Go binary (serves the embedded web build from `server/internal/webui` and `/api`) behind a TLS reverse proxy (Caddy), SQLite on the VM disk, files on R2 with signed-URL downloads — one box, no orchestration; matches SQLite's single-writer model. Runbook: `deploy/README.md`.
 
 ## Risks
 
@@ -48,7 +48,7 @@ Social login, plans/billing, marketplace, templates marketplace, automated email
 - Signature has no legal weight beyond a record (no ICP-Brasil) — record name, email, timestamp, IP, version hash; label clearly in UI; legal review before production.
 - Link token guessable or leaked — 128-bit+ random token, revocable/regenerable, no project details on invalid link.
 - Single SQLite connection limits write concurrency — fine for one professional per account at this scale; keep transactions short.
-- SQLite file lives on the VM, unlike R2 files — scheduled backups (e.g. Litestream to R2) and disk snapshots before launch.
+- SQLite file lives on the VM, unlike R2 files — Litestream replicates it continuously to a separate R2 bucket path (`deploy/litestream.yml`); take a disk snapshot before launch.
 - `product.css` (2.4k lines) is prototype-specific — prune as real screens replace it.
 - Design contract text is illustrative, not a legal template — needs real clause content before launch.
 
@@ -67,4 +67,4 @@ Social login, plans/billing, marketplace, templates marketplace, automated email
 - [x] Delivery: publish delivery, client delivery view, token-checked downloads
 - [x] Adjustment + approval: adjustment cycle, approve, conclude
 - [x] History + notifications: events timeline (pro and client-shared), pro notifications list
-- [ ] Production: single-binary serving of web build, CI, backups, hosting
+- [x] Production: single-binary serving of web build, CI, backups, hosting

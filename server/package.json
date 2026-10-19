@@ -2,13 +2,13 @@
   "name": "pjsuite-server",
   "version": "0.1.0",
   "private": true,
-  "dependencies": {
-    "pjsuite-web": "workspace:*"
-  },
   "scripts": {
     "dev": "go run ./cmd/pjsuite",
     "build": "go build -o bin/pjsuite ./cmd/pjsuite",
     "test": "go test ./...",
     "check:go": "gofumpt -l . && go vet ./..."
+  },
+  "dependencies": {
+    "pjsuite-web": "workspace:*"
   }
 }

@@ -29,3 +29,14 @@ jobs:
       - run: pnpm run test
       - run: pnpm run build
       - run: deploy/smoke.sh
+      - name: install litestream
+        run: |
+          curl -sfL https://github.com/benbjohnson/litestream/releases/download/v0.5.17/litestream-0.5.17-linux-x86_64.tar.gz | sudo tar -xz -C /usr/local/bin litestream
+      - run: deploy/backup-check.sh
+      - name: install caddy
+        run: |
+          curl -sfL "https://caddyserver.com/api/download?os=linux&arch=amd64" -o caddy
+          sudo install caddy /usr/local/bin/caddy
+      - run: caddy validate --config deploy/Caddyfile --adapter caddyfile
+        env:
+          PJSUITE_DOMAIN: pjsuite.example.com
