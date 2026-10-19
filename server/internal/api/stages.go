@@ -23,6 +23,7 @@ var timingKinds = []string{"deadline", "date", "period", "relative", "milestone"
 type stageTask struct {
 	ID    int64  `json:"id"`
 	Title string `json:"title"`
+	Done  bool   `json:"done"`
 }
 
 type stage struct {
@@ -32,6 +33,7 @@ type stage struct {
 	Timing      string      `json:"timing"`
 	Deliverable string      `json:"deliverable"`
 	Visible     bool        `json:"visible"`
+	Status      string      `json:"status"`
 	Tasks       []stageTask `json:"tasks"`
 }
 
@@ -140,7 +142,7 @@ func syncTasks(ctx context.Context, tx *sql.Tx, stageID int64, titles []string) 
 
 func (s *server) loadStages(ctx context.Context, projectID int64) ([]stage, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, name, timing_kind, timing, deliverable, visible FROM stages WHERE project_id = ? ORDER BY position`, projectID)
+		`SELECT id, name, timing_kind, timing, deliverable, visible, status FROM stages WHERE project_id = ? ORDER BY position`, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +150,7 @@ func (s *server) loadStages(ctx context.Context, projectID int64) ([]stage, erro
 	stages := []stage{}
 	for rows.Next() {
 		st := stage{Tasks: []stageTask{}}
-		if err := rows.Scan(&st.ID, &st.Name, &st.TimingKind, &st.Timing, &st.Deliverable, &st.Visible); err != nil {
+		if err := rows.Scan(&st.ID, &st.Name, &st.TimingKind, &st.Timing, &st.Deliverable, &st.Visible, &st.Status); err != nil {
 			return nil, err
 		}
 		stages = append(stages, st)
@@ -161,7 +163,7 @@ func (s *server) loadStages(ctx context.Context, projectID int64) ([]stage, erro
 		index[stages[i].ID] = &stages[i]
 	}
 	taskRows, err := s.db.QueryContext(ctx,
-		`SELECT t.stage_id, t.id, t.title FROM stage_tasks t JOIN stages st ON st.id = t.stage_id
+		`SELECT t.stage_id, t.id, t.title, t.done_at IS NOT NULL FROM stage_tasks t JOIN stages st ON st.id = t.stage_id
 		WHERE st.project_id = ? ORDER BY t.position`, projectID)
 	if err != nil {
 		return nil, err
@@ -170,7 +172,7 @@ func (s *server) loadStages(ctx context.Context, projectID int64) ([]stage, erro
 	for taskRows.Next() {
 		var stageID int64
 		var t stageTask
-		if err := taskRows.Scan(&stageID, &t.ID, &t.Title); err != nil {
+		if err := taskRows.Scan(&stageID, &t.ID, &t.Title, &t.Done); err != nil {
 			return nil, err
 		}
 		index[stageID].Tasks = append(index[stageID].Tasks, t)
