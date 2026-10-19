@@ -168,3 +168,38 @@ func (s *server) loadPortalDeliveries(ctx context.Context, projectID int64) (*[]
 	}
 	return &list, nil
 }
+
+func (s *server) downloadPortalFile(c *echo.Context) error {
+	number, err := strconv.Atoi(c.Param("n"))
+	if err != nil {
+		return echo.ErrNotFound
+	}
+	fid, err := strconv.ParseInt(c.Param("fid"), 10, 64)
+	if err != nil {
+		return echo.ErrNotFound
+	}
+	ctx := c.Request().Context()
+	var projectID int64
+	err = s.db.QueryRowContext(ctx,
+		`SELECT l.project_id FROM share_links l JOIN projects p ON p.id = l.project_id WHERE l.token = ? AND p.archived_at IS NULL`,
+		c.Param("token")).Scan(&projectID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return linkInvalid(c)
+	}
+	if err != nil {
+		return err
+	}
+	var f attachment
+	var key string
+	err = s.db.QueryRowContext(ctx,
+		`SELECT f.id, f.key, f.name, f.content_type, f.size, f.created_at FROM delivery_files f JOIN deliveries d ON d.id = f.delivery_id
+		WHERE f.id = ? AND d.project_id = ? AND d.number = ? AND d.published_at IS NOT NULL`, fid, projectID, number).
+		Scan(&f.ID, &key, &f.Name, &f.ContentType, &f.Size, &f.CreatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return echo.ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	return s.streamObject(c, key, f)
+}

@@ -1,6 +1,8 @@
 package api_test
 
 import (
+	"bytes"
+	"mime"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -237,4 +239,53 @@ func TestDeliveryPortalListsPublishedOnly(t *testing.T) {
 	if len(file) != 3 || file["id"] == nil || file["name"] != "briefing.pdf" || file["size"] == nil {
 		t.Fatalf("file = %v", file)
 	}
+}
+
+func publishedFile(t *testing.T, e *echo.Echo, path, name string, data []byte, a *http.Cookie) attachmentJSON {
+	t.Helper()
+	uploadTo(e, path+"/deliveries/draft/files", "file", name, data, a)
+	if rec := publishDraft(e, path, "Entrega", "", a); rec.Code != http.StatusNoContent {
+		t.Fatalf("publish = %d %s", rec.Code, rec.Body)
+	}
+	return deliveriesOf(t, e, path, a).Published[0].Files[0]
+}
+
+func TestDeliveryPortalDownloadChecksToken(t *testing.T) {
+	e, db, _ := newServerAll(t)
+	a := signedUp(t, e)
+	path, l := signedProject(t, e, a)
+	data := attachmentSamples["briefing.pdf"]
+	file := publishedFile(t, e, path, "briefing.pdf", data, a)
+	url := "/api/portal/" + l.Token + "/deliveries/1/files/" + strconv.Itoa(file.ID)
+
+	rec := get(e, url)
+	if rec.Code != http.StatusOK || !bytes.Equal(rec.Body.Bytes(), data) {
+		t.Fatalf("download = %d %q", rec.Code, rec.Body)
+	}
+	kind, params, err := mime.ParseMediaType(rec.Header().Get("Content-Disposition"))
+	if err != nil || kind != "attachment" || params["filename"] != "briefing.pdf" {
+		t.Errorf("disposition = %q", rec.Header().Get("Content-Disposition"))
+	}
+
+	assertLinkInvalid(t, get(e, "/api/portal/wrong/deliveries/1/files/"+strconv.Itoa(file.ID)))
+
+	otherPath, other := signedProject(t, e, a)
+	publishedFile(t, e, otherPath, "logo.png", attachmentSamples["logo.png"], a)
+	otherURL := "/api/portal/" + other.Token + "/deliveries/1/files/" + strconv.Itoa(file.ID)
+	if rec := get(e, otherURL); rec.Code != http.StatusNotFound {
+		t.Errorf("other project's file = %d", rec.Code)
+	}
+
+	var draft attachmentJSON
+	decode(t, uploadTo(e, path+"/deliveries/draft/files", "file", "logo.png", attachmentSamples["logo.png"], a), &draft)
+	for _, n := range []string{"1", "2"} {
+		if rec := get(e, "/api/portal/"+l.Token+"/deliveries/"+n+"/files/"+strconv.Itoa(draft.ID)); rec.Code != http.StatusNotFound {
+			t.Errorf("draft file via delivery %s = %d", n, rec.Code)
+		}
+	}
+
+	if _, err := db.ExecContext(t.Context(), `UPDATE projects SET archived_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE status = 'signed'`); err != nil {
+		t.Fatalf("archive: %v", err)
+	}
+	assertLinkInvalid(t, get(e, url))
 }
