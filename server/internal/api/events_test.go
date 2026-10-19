@@ -83,3 +83,25 @@ func TestEventsRecordSignatureAndArchive(t *testing.T) {
 	send(e, http.MethodPost, other+"/archive", nil, a)
 	assertEvents(t, db, other, "project_created/pro/false", "archived/pro/false")
 }
+
+func TestEventsRecordDeliveryCycleAndDuplicateDropsThem(t *testing.T) {
+	e, db, _ := newServerAll(t)
+	a := signedUp(t, e)
+	path, l := signedProject(t, e, a)
+	portal := "/api/portal/" + l.Token
+
+	publishNext(t, e, path, a)
+	send(e, http.MethodPost, portal+"/deliveries/1/adjust", map[string]string{"message": "Trocar a cor do logo."}, nil)
+	publishNext(t, e, path, a)
+	postApprove(e, l.Token, "2", map[string]bool{"confirm": true})
+	if rec := send(e, http.MethodPost, path+"/complete", nil, a); rec.Code != http.StatusNoContent {
+		t.Fatalf("complete = %d %s", rec.Code, rec.Body)
+	}
+	assertEvents(t, db, path,
+		"project_created/pro/false", "contract_finalized/pro/false", "version_shared/pro/true", "signed/client/true",
+		"delivery_published/pro/true", "adjust_requested/client/true", "delivery_published/pro/true", "approved/client/true", "completed/pro/true")
+
+	var dup struct{ ID int }
+	decode(t, send(e, http.MethodPost, path+"/duplicate", nil, a), &dup)
+	assertEvents(t, db, "/api/projects/"+strconv.Itoa(dup.ID), "project_created/pro/false")
+}
