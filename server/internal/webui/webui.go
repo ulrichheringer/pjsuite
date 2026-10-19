@@ -35,7 +35,7 @@ func Handler(files fs.FS) echo.HandlerFunc {
 			c.Response().Header().Set("Cache-Control", cache)
 			return c.FileFS(name, files)
 		}
-		if cache == immutable || strings.HasPrefix(name, "api/") {
+		if strings.HasPrefix(name, "assets/") || strings.HasPrefix(name, "api/") {
 			return echo.ErrNotFound
 		}
 		c.Response().Header().Set("Cache-Control", noCache)

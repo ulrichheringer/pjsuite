@@ -41,7 +41,7 @@ Stop the app, restore from the replica, start again:
 
 ```sh
 sudo systemctl stop litestream pjsuite
-sudo -u pjsuite sh -c 'set -a; . /etc/pjsuite/pjsuite.env; set +a; mv "$PJSUITE_DB" "$PJSUITE_DB.broken" 2>/dev/null; litestream restore -config /etc/pjsuite/litestream.yml "$PJSUITE_DB"'
+sudo -u pjsuite sh -c 'set -a; . /etc/pjsuite/pjsuite.env; set +a; mkdir -p "$PJSUITE_DB.broken" && for f in "$PJSUITE_DB" "$PJSUITE_DB-wal" "$PJSUITE_DB-shm"; do [ ! -e "$f" ] || mv "$f" "$PJSUITE_DB.broken/"; done && litestream restore -config /etc/pjsuite/litestream.yml "$PJSUITE_DB"'
 sudo systemctl start pjsuite litestream
 ```
 

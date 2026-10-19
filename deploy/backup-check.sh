@@ -31,11 +31,13 @@ for _ in $(seq 50); do
   sleep 0.2
 done
 [ -n "$(ls -A "$work/replica" 2>/dev/null)" ] || fail "nothing replicated"
-sleep 2
+sqlite3 "$work/pjsuite.db" ".timeout 5000" "INSERT INTO users (email, name, password_hash) VALUES ('backup@check.test', 'Backup Check', 'x')" || fail "insert failed"
+sleep 3
 
 litestream restore -config "$work/litestream.yml" -o "$work/restored.db" "$work/pjsuite.db" >/dev/null 2>&1 || fail "restore failed"
 
-query="SELECT COUNT(*) FROM goose_db_version"
-[ "$(sqlite3 "$work/restored.db" "$query")" = "$(sqlite3 "$work/pjsuite.db" "$query")" ] || fail "restored database differs"
+[ "$(sqlite3 "$work/restored.db" "PRAGMA integrity_check")" = "ok" ] || fail "restored database corrupt"
+query="SELECT COUNT(*) FROM users WHERE email = 'backup@check.test'"
+[ "$(sqlite3 "$work/restored.db" "$query")" = "1" ] || fail "inserted row missing from restored database"
 
 echo "backup-check: ok"
