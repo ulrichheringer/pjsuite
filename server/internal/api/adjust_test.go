@@ -95,6 +95,65 @@ func TestApproveRequiresConfirmationAndReturnsReceipt(t *testing.T) {
 	}
 }
 
+func TestAdjustListsExposeResponsesAndPhase(t *testing.T) {
+	e, _ := newAttachmentServer(t)
+	a := signedUp(t, e)
+	path, l := signedProject(t, e, a)
+	portal := "/api/portal/" + l.Token
+	type response struct {
+		Kind      string `json:"kind"`
+		Message   string `json:"message"`
+		CreatedAt string `json:"createdAt"`
+	}
+	var pro struct {
+		Phase       string  `json:"phase"`
+		CompletedAt *string `json:"completedAt"`
+		Published   []struct {
+			Number   int       `json:"number"`
+			Response *response `json:"response"`
+		} `json:"published"`
+	}
+	var view struct {
+		CompletedAt *string `json:"completedAt"`
+		Deliveries  []struct {
+			Number   int       `json:"number"`
+			Response *response `json:"response"`
+		} `json:"deliveries"`
+	}
+	phase := func() string {
+		pro.Published, view.Deliveries = nil, nil
+		decode(t, get(e, path+"/deliveries", a), &pro)
+		decode(t, get(e, portal), &view)
+		return pro.Phase
+	}
+
+	if got := phase(); got != "executing" {
+		t.Fatalf("no delivery phase = %q", got)
+	}
+	publishNext(t, e, path, a)
+	if got := phase(); got != "executing" || pro.Published[0].Response != nil || view.Deliveries[0].Response != nil {
+		t.Fatalf("unanswered = %q %+v", got, pro.Published)
+	}
+	if rec := send(e, http.MethodPost, portal+"/deliveries/1/adjust", map[string]string{"message": "Trocar a cor do logo."}, nil); rec.Code != http.StatusNoContent {
+		t.Fatalf("adjust = %d", rec.Code)
+	}
+	got := phase()
+	r := pro.Published[0].Response
+	if got != "awaiting_adjustment" || r == nil || r.Kind != "adjust" || r.Message != "Trocar a cor do logo." || r.CreatedAt == "" || view.Deliveries[0].Response == nil || *view.Deliveries[0].Response != *r {
+		t.Fatalf("adjusted = %q %+v / %+v", got, pro.Published, view.Deliveries)
+	}
+	publishNext(t, e, path, a)
+	if got := phase(); got != "executing" || pro.Published[1].Response == nil || pro.Published[0].Response != nil {
+		t.Fatalf("revised = %q %+v", got, pro.Published)
+	}
+	if rec := postApprove(e, l.Token, "2", map[string]bool{"confirm": true}); rec.Code != http.StatusOK {
+		t.Fatalf("approve = %d", rec.Code)
+	}
+	if got := phase(); got != "executing" || pro.Published[0].Response.Kind != "approve" {
+		t.Fatalf("approved = %q %+v", got, pro.Published)
+	}
+}
+
 func TestAdjustDBRestrictsResponsesAndFreezesCompleted(t *testing.T) {
 	e, db := newServerDB(t)
 	a := signedUp(t, e)

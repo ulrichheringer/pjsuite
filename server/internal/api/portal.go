@@ -28,20 +28,22 @@ type portalFile struct {
 }
 
 type portalDelivery struct {
-	Number      int          `json:"number"`
-	Title       string       `json:"title"`
-	Message     string       `json:"message"`
-	PublishedAt string       `json:"publishedAt"`
-	Files       []portalFile `json:"files"`
+	Number      int               `json:"number"`
+	Title       string            `json:"title"`
+	Message     string            `json:"message"`
+	PublishedAt string            `json:"publishedAt"`
+	Response    *deliveryResponse `json:"response"`
+	Files       []portalFile      `json:"files"`
 }
 
 type portalView struct {
-	Version    int               `json:"version"`
-	Status     string            `json:"status"`
-	Content    json.RawMessage   `json:"content"`
-	Signature  *receipt          `json:"signature"`
-	Progress   *[]portalProgress `json:"progress,omitempty"`
-	Deliveries *[]portalDelivery `json:"deliveries,omitempty"`
+	Version     int               `json:"version"`
+	Status      string            `json:"status"`
+	CompletedAt *string           `json:"completedAt"`
+	Content     json.RawMessage   `json:"content"`
+	Signature   *receipt          `json:"signature"`
+	Progress    *[]portalProgress `json:"progress,omitempty"`
+	Deliveries  *[]portalDelivery `json:"deliveries,omitempty"`
 }
 
 func linkInvalid(c *echo.Context) error {
@@ -67,8 +69,8 @@ func (s *server) getPortal(c *echo.Context) error {
 			return err
 		}
 		err = tx.QueryRowContext(ctx,
-			`SELECT v.number, v.content, p.status FROM contract_versions v JOIN projects p ON p.id = v.project_id
-			WHERE v.project_id = ? ORDER BY v.number DESC LIMIT 1`, projectID).Scan(&view.Version, &content, &view.Status)
+			`SELECT v.number, v.content, p.status, p.completed_at FROM contract_versions v JOIN projects p ON p.id = v.project_id
+			WHERE v.project_id = ? ORDER BY v.number DESC LIMIT 1`, projectID).Scan(&view.Version, &content, &view.Status, &view.CompletedAt)
 		if err != nil {
 			return err
 		}
