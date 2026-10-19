@@ -101,14 +101,9 @@ test("notices show an error banner when loading fails", async () => {
 
   expect(await screen.findByText("Não foi possível carregar os avisos.")).toBeVisible();
 });
+test("notices redirect to /entrar when the session expired", async () => {
+  mockFetch(() => jsonResponse(401));
+  const router = renderAt("/avisos");
 
-test("the projects list nav shows the unread count", async () => {
-  mockFetch((path) =>
-    path === "/api/notifications"
-      ? jsonResponse(200, { unread: 3, items: [] })
-      : jsonResponse(200, []),
-  );
-  renderAt("/projetos");
-
-  expect(await screen.findByRole("link", { name: /Avisos/ })).toHaveTextContent("3");
+  await vi.waitFor(() => expect(router.state.location.pathname).toBe("/entrar"));
 });

@@ -61,6 +61,30 @@ test("the client actions filter hides professional events", async () => {
   expect(screen.getAllByRole("listitem")).toHaveLength(3);
 });
 
+test("the client actions filter without client events shows an empty state", async () => {
+  historyRoutes(() => jsonResponse(200, events.slice(1)));
+  renderAt("/projetos/5/historico");
+
+  await screen.findAllByRole("listitem");
+  await userEvent.click(screen.getByRole("tab", { name: "Ações do cliente" }));
+
+  expect(await screen.findByText("Nenhuma ação do cliente ainda.")).toBeVisible();
+  expect(screen.queryByRole("listitem")).toBeNull();
+});
+
+test("the history nav shows the unread count", async () => {
+  mockFetch((path) =>
+    path === "/api/notifications"
+      ? jsonResponse(200, { unread: 4, items: [] })
+      : path === "/api/projects/5/events"
+        ? jsonResponse(200, events)
+        : jsonResponse(500),
+  );
+  renderAt("/projetos/5/historico");
+
+  expect(await screen.findByRole("link", { name: /Avisos/ })).toHaveTextContent("4");
+});
+
 test("a project without events shows the empty state", async () => {
   historyRoutes(() => jsonResponse(200, []));
   renderAt("/projetos/5/historico");

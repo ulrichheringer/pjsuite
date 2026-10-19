@@ -3,6 +3,7 @@ import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 import { eventTitle, getProjectEvents, type ProjectEvent } from "@/api";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ProNav, useNotifications } from "@/pro-nav";
 import { Banner, Blank, Button, Loading, Timeline } from "@/ui";
 
 export const Route = createFileRoute("/projetos/$id_/historico")({ component: HistoryPage });
@@ -10,6 +11,7 @@ export const Route = createFileRoute("/projetos/$id_/historico")({ component: Hi
 function HistoryPage() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
+  const { notifications } = useNotifications();
   const [events, setEvents] = useState<ProjectEvent[]>();
   const [failed, setFailed] = useState(false);
   const [filter, setFilter] = useState<"all" | "client">("all");
@@ -27,6 +29,7 @@ function HistoryPage() {
   return (
     <div className="product">
       <main className="pro-main">
+        <ProNav unread={notifications?.unread ?? 0} />
         <header className="page-heading">
           <div>
             <span className="eyebrow">ACOMPANHAMENTO</span>
@@ -63,13 +66,20 @@ function HistoryPage() {
                 <TabsTrigger value="client">Ações do cliente</TabsTrigger>
               </TabsList>
             </Tabs>
-            <Timeline
-              events={shown.map((e) => ({
-                title: eventTitle(e),
-                author: e.actorName,
-                at: e.createdAt,
-              }))}
-            />
+            {shown.length === 0 ? (
+              <Blank
+                title="Nenhuma ação do cliente ainda."
+                description="Visualizações, pedidos de alteração e decisões do cliente aparecem aqui."
+              />
+            ) : (
+              <Timeline
+                events={shown.map((e) => ({
+                  title: eventTitle(e),
+                  author: e.actorName,
+                  at: e.createdAt,
+                }))}
+              />
+            )}
           </section>
         )}
       </main>

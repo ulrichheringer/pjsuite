@@ -1,17 +1,19 @@
 import { useEffect, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { getNotifications, type Notifications } from "@/api";
 
 export function useNotifications() {
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notifications>();
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     getNotifications().then((outcome) => {
+      if (outcome.kind === "unauthorized") return navigate({ to: "/entrar" });
       if (outcome.kind !== "ok") return setFailed(true);
       setNotifications(outcome.value);
     });
-  }, []);
+  }, [navigate]);
 
   return { notifications, setNotifications, failed };
 }
