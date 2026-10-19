@@ -21,7 +21,9 @@ import { Route as ProjetosIndexRouteImport } from './routes/projetos.index'
 import { Route as ProjetosIdRouteImport } from './routes/projetos.$id'
 import { Route as ProjetosNovoRouteImport } from './routes/projetos.novo'
 import { Route as PTokenAcompanharRouteImport } from './routes/p.$token_.acompanhar'
+import { Route as PTokenAjusteRouteImport } from './routes/p.$token_.ajuste'
 import { Route as PTokenAlteracaoRouteImport } from './routes/p.$token_.alteracao'
+import { Route as PTokenAprovarRouteImport } from './routes/p.$token_.aprovar'
 import { Route as PTokenAssinarRouteImport } from './routes/p.$token_.assinar'
 import { Route as PTokenEntregaRouteImport } from './routes/p.$token_.entrega'
 import { Route as PTokenRecusarRouteImport } from './routes/p.$token_.recusar'
@@ -94,9 +96,19 @@ const PTokenAcompanharRoute = PTokenAcompanharRouteImport.update({
   path: '/p/$token/acompanhar',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PTokenAjusteRoute = PTokenAjusteRouteImport.update({
+  id: '/p/$token_/ajuste',
+  path: '/p/$token/ajuste',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PTokenAlteracaoRoute = PTokenAlteracaoRouteImport.update({
   id: '/p/$token_/alteracao',
   path: '/p/$token/alteracao',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PTokenAprovarRoute = PTokenAprovarRouteImport.update({
+  id: '/p/$token_/aprovar',
+  path: '/p/$token/aprovar',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PTokenAssinarRoute = PTokenAssinarRouteImport.update({
@@ -169,7 +181,9 @@ export interface FileRoutesByFullPath {
   '/clientes/': typeof ClientesIndexRoute
   '/projetos/': typeof ProjetosIndexRoute
   '/p/$token/acompanhar': typeof PTokenAcompanharRoute
+  '/p/$token/ajuste': typeof PTokenAjusteRoute
   '/p/$token/alteracao': typeof PTokenAlteracaoRoute
+  '/p/$token/aprovar': typeof PTokenAprovarRoute
   '/p/$token/assinar': typeof PTokenAssinarRoute
   '/p/$token/entrega': typeof PTokenEntregaRoute
   '/p/$token/recusar': typeof PTokenRecusarRoute
@@ -195,7 +209,9 @@ export interface FileRoutesByTo {
   '/clientes': typeof ClientesIndexRoute
   '/projetos': typeof ProjetosIndexRoute
   '/p/$token/acompanhar': typeof PTokenAcompanharRoute
+  '/p/$token/ajuste': typeof PTokenAjusteRoute
   '/p/$token/alteracao': typeof PTokenAlteracaoRoute
+  '/p/$token/aprovar': typeof PTokenAprovarRoute
   '/p/$token/assinar': typeof PTokenAssinarRoute
   '/p/$token/entrega': typeof PTokenEntregaRoute
   '/p/$token/recusar': typeof PTokenRecusarRoute
@@ -222,7 +238,9 @@ export interface FileRoutesById {
   '/clientes/': typeof ClientesIndexRoute
   '/projetos/': typeof ProjetosIndexRoute
   '/p/$token_/acompanhar': typeof PTokenAcompanharRoute
+  '/p/$token_/ajuste': typeof PTokenAjusteRoute
   '/p/$token_/alteracao': typeof PTokenAlteracaoRoute
+  '/p/$token_/aprovar': typeof PTokenAprovarRoute
   '/p/$token_/assinar': typeof PTokenAssinarRoute
   '/p/$token_/entrega': typeof PTokenEntregaRoute
   '/p/$token_/recusar': typeof PTokenRecusarRoute
@@ -250,7 +268,9 @@ export interface FileRouteTypes {
     | '/clientes/'
     | '/projetos/'
     | '/p/$token/acompanhar'
+    | '/p/$token/ajuste'
     | '/p/$token/alteracao'
+    | '/p/$token/aprovar'
     | '/p/$token/assinar'
     | '/p/$token/entrega'
     | '/p/$token/recusar'
@@ -276,7 +296,9 @@ export interface FileRouteTypes {
     | '/clientes'
     | '/projetos'
     | '/p/$token/acompanhar'
+    | '/p/$token/ajuste'
     | '/p/$token/alteracao'
+    | '/p/$token/aprovar'
     | '/p/$token/assinar'
     | '/p/$token/entrega'
     | '/p/$token/recusar'
@@ -302,7 +324,9 @@ export interface FileRouteTypes {
     | '/clientes/'
     | '/projetos/'
     | '/p/$token_/acompanhar'
+    | '/p/$token_/ajuste'
     | '/p/$token_/alteracao'
+    | '/p/$token_/aprovar'
     | '/p/$token_/assinar'
     | '/p/$token_/entrega'
     | '/p/$token_/recusar'
@@ -329,7 +353,9 @@ export interface RootRouteChildren {
   ClientesIndexRoute: typeof ClientesIndexRoute
   ProjetosIndexRoute: typeof ProjetosIndexRoute
   PTokenAcompanharRoute: typeof PTokenAcompanharRoute
+  PTokenAjusteRoute: typeof PTokenAjusteRoute
   PTokenAlteracaoRoute: typeof PTokenAlteracaoRoute
+  PTokenAprovarRoute: typeof PTokenAprovarRoute
   PTokenAssinarRoute: typeof PTokenAssinarRoute
   PTokenEntregaRoute: typeof PTokenEntregaRoute
   PTokenRecusarRoute: typeof PTokenRecusarRoute
@@ -429,11 +455,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PTokenAcompanharRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/p/$token_/ajuste': {
+      id: '/p/$token_/ajuste'
+      path: '/p/$token/ajuste'
+      fullPath: '/p/$token/ajuste'
+      preLoaderRoute: typeof PTokenAjusteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/p/$token_/alteracao': {
       id: '/p/$token_/alteracao'
       path: '/p/$token/alteracao'
       fullPath: '/p/$token/alteracao'
       preLoaderRoute: typeof PTokenAlteracaoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/p/$token_/aprovar': {
+      id: '/p/$token_/aprovar'
+      path: '/p/$token/aprovar'
+      fullPath: '/p/$token/aprovar'
+      preLoaderRoute: typeof PTokenAprovarRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/p/$token_/assinar': {
@@ -529,7 +569,9 @@ const rootRouteChildren: RootRouteChildren = {
   ClientesIndexRoute: ClientesIndexRoute,
   ProjetosIndexRoute: ProjetosIndexRoute,
   PTokenAcompanharRoute: PTokenAcompanharRoute,
+  PTokenAjusteRoute: PTokenAjusteRoute,
   PTokenAlteracaoRoute: PTokenAlteracaoRoute,
+  PTokenAprovarRoute: PTokenAprovarRoute,
   PTokenAssinarRoute: PTokenAssinarRoute,
   PTokenEntregaRoute: PTokenEntregaRoute,
   PTokenRecusarRoute: PTokenRecusarRoute,

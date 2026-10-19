@@ -2,6 +2,11 @@ import { useEffect, useState, type ReactNode } from "react";
 import { getPortal, type Portal, type Receipt } from "@/api";
 import { Banner, Blank, Loading } from "@/ui";
 
+export function openDelivery(portal: Portal) {
+  const latest = portal.deliveries?.[0];
+  return latest && !latest.response && !portal.completedAt ? latest : undefined;
+}
+
 type PortalState =
   | { kind: "loading" }
   | { kind: "invalid" }
