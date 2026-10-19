@@ -405,3 +405,66 @@ func TestExecutionStageFilesAreScopedAndSignedOnly(t *testing.T) {
 		t.Errorf("unsigned upload = %d, objects = %d (want 409 and only the attachment)", rec.Code, files2.Len())
 	}
 }
+
+type portalProgressJSON struct {
+	Progress []struct {
+		Name   string `json:"name"`
+		Status string `json:"status"`
+	} `json:"progress"`
+}
+
+func TestExecutionPortalListsVisibleStageProgressWhenSigned(t *testing.T) {
+	e := newServer(t)
+	a := signedUp(t, e)
+	path, l := signedProject(t, e, a)
+	portal := "/api/portal/" + l.Token
+	if rec := send(e, http.MethodPut, path+"/stages/1/status", map[string]string{"status": "in_progress"}, a); rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	if rec := send(e, http.MethodPost, path+"/stages/1/tasks", map[string]string{"title": "TAREFA-NOVA"}, a); rec.Code != http.StatusCreated {
+		t.Fatalf("task = %d", rec.Code)
+	}
+	if rec := uploadTo(e, path+"/stages/1/files", "file", "interno.pdf", attachmentSamples["briefing.pdf"], a); rec.Code != http.StatusCreated {
+		t.Fatalf("file = %d", rec.Code)
+	}
+
+	rec := get(e, portal)
+	var got portalProgressJSON
+	decode(t, rec, &got)
+	if len(got.Progress) != 1 || got.Progress[0].Name != "Etapa Aberta" || got.Progress[0].Status != "in_progress" {
+		t.Fatalf("progress = %+v", got.Progress)
+	}
+	for _, secret := range []string{"Etapa Oculta", "TAREFA-", "ENTREGA-OCULTA", "NOTA-SECRETA", "interno.pdf"} {
+		if strings.Contains(strings.SplitN(rec.Body.String(), `"progress"`, 2)[1], secret) {
+			t.Errorf("progress leaked %q: %s", secret, rec.Body)
+		}
+	}
+	if strings.Contains(rec.Body.String(), `"tasks"`) || strings.Contains(rec.Body.String(), `"files"`) {
+		t.Errorf("portal exposes execution data: %s", rec.Body)
+	}
+}
+
+func TestExecutionPortalOmitsProgressUnlessSignedAndStagesVisible(t *testing.T) {
+	e := newServer(t)
+	a := signedUp(t, e)
+	_, l := finalizedShare(t, e, a)
+	if body := get(e, "/api/portal/"+l.Token).Body.String(); strings.Contains(body, `"progress"`) {
+		t.Errorf("unsigned portal has progress: %s", body)
+	}
+
+	e2 := newServer(t)
+	a2 := signedUp(t, e2)
+	path := filledProject(t, e2, a2)
+	if rec := send(e2, http.MethodPut, path+"/visibility", map[string]bool{"stages": false}, a2); rec.Code != http.StatusNoContent {
+		t.Fatalf("visibility = %d", rec.Code)
+	}
+	send(e2, http.MethodPost, path+"/contract", nil, a2)
+	var l2 shareJSON
+	decode(t, send(e2, http.MethodPost, path+"/share", nil, a2), &l2)
+	if rec := send(e2, http.MethodPost, "/api/portal/"+l2.Token+"/sign", signBody(1), nil); rec.Code != http.StatusOK {
+		t.Fatalf("sign = %d", rec.Code)
+	}
+	if body := get(e2, "/api/portal/"+l2.Token).Body.String(); strings.Contains(body, `"progress"`) {
+		t.Errorf("hidden stages block has progress: %s", body)
+	}
+}
