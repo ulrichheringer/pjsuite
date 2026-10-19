@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import {
   attachmentSizeError,
   deleteDraftFile,
+  deliveryPhaseLabels,
   getDeliveries,
   publishDelivery,
   uploadDraftFile,
@@ -84,14 +85,18 @@ function DeliveryPage() {
 
   const files = deliveries?.draft?.files ?? [];
 
+  const request = deliveries?.published[0]?.response;
+  const revising = deliveries?.phase === "awaiting_adjustment";
+  const approved = request?.kind === "approve";
+
   return (
     <div className="product">
       <main className="pro-main">
         <header className="page-heading">
           <div>
             <span className="eyebrow">ACOMPANHAMENTO</span>
-            <h1>Publicar entrega</h1>
-            <Badge>Em execução</Badge>
+            <h1>{revising ? "Publicar revisão" : "Publicar entrega"}</h1>
+            <Badge>{deliveries ? deliveryPhaseLabels[deliveries.phase] : "Em execução"}</Badge>
             <p>Envie o material final com uma mensagem para o cliente.</p>
           </div>
           <Button asChild variant="outline">
@@ -110,7 +115,19 @@ function DeliveryPage() {
         {errors.files && <Banner title={errors.files} tone="danger" />}
         {published && <Banner title="Entrega publicada." tone="success" />}
         {!deliveries && !loadFailed && <Loading />}
-        {deliveries && (
+        {revising && request && (
+          <Banner title="Pedido de ajuste do cliente" tone="warning">
+            {`${new Date(request.createdAt).toLocaleDateString("pt-BR")} · ${request.message}`}
+          </Banner>
+        )}
+        {approved && (
+          <Button asChild>
+            <Link to="/projetos/$id/conclusao" params={{ id }}>
+              {deliveries?.phase === "completed" ? "Ver conclusão" : "Concluir projeto"}
+            </Link>
+          </Button>
+        )}
+        {deliveries && deliveries.phase !== "completed" && (
           <form className="surface" onSubmit={publish}>
             <Field label="Título" required value={title} error={errors.title} onChange={setTitle} />
             <Field
@@ -133,7 +150,7 @@ function DeliveryPage() {
               Depois de publicada, a entrega não pode ser alterada.
             </Banner>
             <div className="form-actions">
-              <Button type="submit">Publicar entrega</Button>
+              <Button type="submit">{revising ? "Publicar revisão" : "Publicar entrega"}</Button>
             </div>
           </form>
         )}
