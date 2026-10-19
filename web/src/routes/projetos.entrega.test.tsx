@@ -116,7 +116,9 @@ test("publishing posts title and message and shows the success banner", async ()
   await userEvent.click(screen.getByRole("button", { name: "Publicar entrega" }));
 
   expect(await screen.findByText("Entrega publicada.")).toBeVisible();
-  const call = spy.mock.calls.find(([path]) => path.endsWith("/draft/publish"))!;
+  const call = spy.mock.calls.find(
+    ([path]) => path === "/api/projects/5/deliveries/draft/publish",
+  )!;
   expect(JSON.parse(String(call[1]?.body))).toEqual({
     title: "Primeira entrega",
     message: "Segue o material.",

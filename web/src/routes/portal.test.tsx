@@ -238,6 +238,71 @@ test("the progress screen shows an error banner when loading fails", async () =>
   expect(await screen.findByText("Não foi possível abrir o projeto.")).toBeVisible();
 });
 
+const deliveries = [
+  {
+    number: 2,
+    title: "Ajustes finais",
+    message: "Cores corrigidas.",
+    publishedAt: "2026-10-20T12:00:00Z",
+    files: [{ id: 9, name: "marca-v2.png", size: 3 * 1024 * 1024 }],
+  },
+  {
+    number: 1,
+    title: "Primeira entrega",
+    message: "",
+    publishedAt: "2026-10-18T12:00:00Z",
+    files: [{ id: 4, name: "marca.pdf", size: 2048 }],
+  },
+];
+
+test("the delivery screen lists published deliveries newest first with download links", async () => {
+  mockFetch(() => jsonResponse(200, { ...portal("signed", receipt), deliveries }));
+  renderAt("/p/TOK/entrega");
+
+  expect(await screen.findByRole("heading", { name: "Ver entrega" })).toBeVisible();
+  const titles = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+  expect(titles).toEqual(["Ajustes finais", "Primeira entrega"]);
+  expect(screen.getByText("Cores corrigidas.")).toBeVisible();
+  expect(screen.getByText("3,0 MB")).toBeVisible();
+  expect(screen.getByRole("link", { name: "Baixar marca-v2.png" })).toHaveAttribute(
+    "href",
+    "/api/portal/TOK/deliveries/2/files/9",
+  );
+  expect(screen.getByRole("link", { name: "Baixar marca.pdf" })).toHaveAttribute(
+    "href",
+    "/api/portal/TOK/deliveries/1/files/4",
+  );
+});
+
+test("the delivery screen shows the empty state without published deliveries", async () => {
+  mockFetch(() => jsonResponse(200, { ...portal("signed", receipt), deliveries: [] }));
+  renderAt("/p/TOK/entrega");
+
+  expect(await screen.findByText("Nenhuma entrega publicada.")).toBeVisible();
+});
+
+test("the delivery screen shows an error banner when loading fails", async () => {
+  mockFetch(() => jsonResponse(500));
+  renderAt("/p/TOK/entrega");
+
+  expect(await screen.findByText("Não foi possível abrir o projeto.")).toBeVisible();
+});
+
+test("progress links to the delivery only when one is published", async () => {
+  mockFetch(() => jsonResponse(200, { ...portal("signed", receipt), deliveries }));
+  renderAt("/p/TOK/acompanhar");
+  expect(await screen.findByRole("link", { name: "Ver entrega" })).toHaveAttribute(
+    "href",
+    "/p/TOK/entrega",
+  );
+  cleanup();
+
+  mockFetch(() => jsonResponse(200, { ...portal("signed", receipt), deliveries: [] }));
+  renderAt("/p/TOK/acompanhar");
+  expect(await screen.findByRole("heading", { name: "Acompanhar projeto" })).toBeVisible();
+  expect(screen.queryByRole("link", { name: "Ver entrega" })).toBeNull();
+});
+
 test("the sign screen posts the signature and shows the receipt", async () => {
   const receipt = {
     name: "Ana Lima",

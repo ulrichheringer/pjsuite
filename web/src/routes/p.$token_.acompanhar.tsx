@@ -28,6 +28,11 @@ function ProgressPage() {
               description="As etapas visíveis aparecem aqui conforme o trabalho avança."
             />
           )}
+          {portal.deliveries?.length ? (
+            <Link to="/p/$token/entrega" params={{ token }}>
+              Ver entrega
+            </Link>
+          ) : null}
           <Link to="/p/$token" params={{ token }}>
             Voltar ao contrato
           </Link>

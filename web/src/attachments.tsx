@@ -27,13 +27,13 @@ export const precheck = (file: File) => {
   return file.size > maxAttachmentBytes ? attachmentSizeError : undefined;
 };
 
-export const fileMeta = (file: Attachment) => {
-  const size =
-    file.size < 1024 * 1024
-      ? `${Math.max(1, Math.round(file.size / 1024))} KB`
-      : `${(file.size / (1024 * 1024)).toFixed(1).replace(".", ",")} MB`;
-  return `${typeLabels[file.contentType] ?? file.contentType} · ${size}`;
-};
+export const fileSize = (bytes: number) =>
+  bytes < 1024 * 1024
+    ? `${Math.max(1, Math.round(bytes / 1024))} KB`
+    : `${(bytes / (1024 * 1024)).toFixed(1).replace(".", ",")} MB`;
+
+export const fileMeta = (file: Attachment) =>
+  `${typeLabels[file.contentType] ?? file.contentType} · ${fileSize(file.size)}`;
 
 export function Attachments({ projectId, readOnly }: { projectId: string; readOnly: boolean }) {
   const navigate = useNavigate();

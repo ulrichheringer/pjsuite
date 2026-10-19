@@ -112,13 +112,7 @@ function DeliveryPage() {
         {!deliveries && !loadFailed && <Loading />}
         {deliveries && (
           <form className="surface" onSubmit={publish}>
-            <Field
-              label="Título"
-              required
-              value={title}
-              error={errors.title}
-              onChange={setTitle}
-            />
+            <Field label="Título" required value={title} error={errors.title} onChange={setTitle} />
             <Field
               label="Mensagem"
               area

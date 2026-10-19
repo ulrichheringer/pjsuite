@@ -23,6 +23,7 @@ import { Route as ProjetosNovoRouteImport } from './routes/projetos.novo'
 import { Route as PTokenAcompanharRouteImport } from './routes/p.$token_.acompanhar'
 import { Route as PTokenAlteracaoRouteImport } from './routes/p.$token_.alteracao'
 import { Route as PTokenAssinarRouteImport } from './routes/p.$token_.assinar'
+import { Route as PTokenEntregaRouteImport } from './routes/p.$token_.entrega'
 import { Route as PTokenRecusarRouteImport } from './routes/p.$token_.recusar'
 import { Route as ProjetosIdCompartilharRouteImport } from './routes/projetos.$id_.compartilhar'
 import { Route as ProjetosIdEntregaRouteImport } from './routes/projetos.$id_.entrega'
@@ -103,6 +104,11 @@ const PTokenAssinarRoute = PTokenAssinarRouteImport.update({
   path: '/p/$token/assinar',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PTokenEntregaRoute = PTokenEntregaRouteImport.update({
+  id: '/p/$token_/entrega',
+  path: '/p/$token/entrega',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PTokenRecusarRoute = PTokenRecusarRouteImport.update({
   id: '/p/$token_/recusar',
   path: '/p/$token/recusar',
@@ -165,6 +171,7 @@ export interface FileRoutesByFullPath {
   '/p/$token/acompanhar': typeof PTokenAcompanharRoute
   '/p/$token/alteracao': typeof PTokenAlteracaoRoute
   '/p/$token/assinar': typeof PTokenAssinarRoute
+  '/p/$token/entrega': typeof PTokenEntregaRoute
   '/p/$token/recusar': typeof PTokenRecusarRoute
   '/projetos/$id/compartilhar': typeof ProjetosIdCompartilharRoute
   '/projetos/$id/entrega': typeof ProjetosIdEntregaRoute
@@ -190,6 +197,7 @@ export interface FileRoutesByTo {
   '/p/$token/acompanhar': typeof PTokenAcompanharRoute
   '/p/$token/alteracao': typeof PTokenAlteracaoRoute
   '/p/$token/assinar': typeof PTokenAssinarRoute
+  '/p/$token/entrega': typeof PTokenEntregaRoute
   '/p/$token/recusar': typeof PTokenRecusarRoute
   '/projetos/$id/compartilhar': typeof ProjetosIdCompartilharRoute
   '/projetos/$id/entrega': typeof ProjetosIdEntregaRoute
@@ -216,6 +224,7 @@ export interface FileRoutesById {
   '/p/$token_/acompanhar': typeof PTokenAcompanharRoute
   '/p/$token_/alteracao': typeof PTokenAlteracaoRoute
   '/p/$token_/assinar': typeof PTokenAssinarRoute
+  '/p/$token_/entrega': typeof PTokenEntregaRoute
   '/p/$token_/recusar': typeof PTokenRecusarRoute
   '/projetos/$id_/compartilhar': typeof ProjetosIdCompartilharRoute
   '/projetos/$id_/entrega': typeof ProjetosIdEntregaRoute
@@ -243,6 +252,7 @@ export interface FileRouteTypes {
     | '/p/$token/acompanhar'
     | '/p/$token/alteracao'
     | '/p/$token/assinar'
+    | '/p/$token/entrega'
     | '/p/$token/recusar'
     | '/projetos/$id/compartilhar'
     | '/projetos/$id/entrega'
@@ -268,6 +278,7 @@ export interface FileRouteTypes {
     | '/p/$token/acompanhar'
     | '/p/$token/alteracao'
     | '/p/$token/assinar'
+    | '/p/$token/entrega'
     | '/p/$token/recusar'
     | '/projetos/$id/compartilhar'
     | '/projetos/$id/entrega'
@@ -293,6 +304,7 @@ export interface FileRouteTypes {
     | '/p/$token_/acompanhar'
     | '/p/$token_/alteracao'
     | '/p/$token_/assinar'
+    | '/p/$token_/entrega'
     | '/p/$token_/recusar'
     | '/projetos/$id_/compartilhar'
     | '/projetos/$id_/entrega'
@@ -319,6 +331,7 @@ export interface RootRouteChildren {
   PTokenAcompanharRoute: typeof PTokenAcompanharRoute
   PTokenAlteracaoRoute: typeof PTokenAlteracaoRoute
   PTokenAssinarRoute: typeof PTokenAssinarRoute
+  PTokenEntregaRoute: typeof PTokenEntregaRoute
   PTokenRecusarRoute: typeof PTokenRecusarRoute
   ProjetosIdCompartilharRoute: typeof ProjetosIdCompartilharRoute
   ProjetosIdEntregaRoute: typeof ProjetosIdEntregaRoute
@@ -430,6 +443,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PTokenAssinarRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/p/$token_/entrega': {
+      id: '/p/$token_/entrega'
+      path: '/p/$token/entrega'
+      fullPath: '/p/$token/entrega'
+      preLoaderRoute: typeof PTokenEntregaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/p/$token_/recusar': {
       id: '/p/$token_/recusar'
       path: '/p/$token/recusar'
@@ -511,6 +531,7 @@ const rootRouteChildren: RootRouteChildren = {
   PTokenAcompanharRoute: PTokenAcompanharRoute,
   PTokenAlteracaoRoute: PTokenAlteracaoRoute,
   PTokenAssinarRoute: PTokenAssinarRoute,
+  PTokenEntregaRoute: PTokenEntregaRoute,
   PTokenRecusarRoute: PTokenRecusarRoute,
   ProjetosIdCompartilharRoute: ProjetosIdCompartilharRoute,
   ProjetosIdEntregaRoute: ProjetosIdEntregaRoute,
