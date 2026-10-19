@@ -19,6 +19,7 @@ import {
 } from "@/api";
 import { StageDialog } from "@/stage-dialog";
 import { PaymentPlan } from "@/payment-plan";
+import { Attachments } from "@/attachments";
 import { Badge, Banner, Button, Field, Loading, Section } from "@/ui";
 
 export const Route = createFileRoute("/projetos/$id_/montagem")({ component: BuilderPage });
@@ -261,6 +262,7 @@ function BuilderPage() {
               />
             </Section>
             <PaymentPlan projectId={id} readOnly={project.archived} />
+            <Attachments projectId={id} readOnly={project.archived} />
           </div>
           <aside className="editor-side">
             <Section label="Estrutura do projeto">

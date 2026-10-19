@@ -6,14 +6,19 @@ import (
 
 	"github.com/labstack/echo/v5"
 	"github.com/labstack/echo/v5/middleware"
+
+	"github.com/ulrichheringer/pjsuite/server/internal/storage"
 )
 
 const maxJSONBytes = 1 << 20
 
-type server struct{ db *sql.DB }
+type server struct {
+	db    *sql.DB
+	files storage.Store
+}
 
-func New(db *sql.DB) *echo.Echo {
-	s := &server{db: db}
+func New(db *sql.DB, files storage.Store) *echo.Echo {
+	s := &server{db: db, files: files}
 	e := echo.New()
 	e.Use(middleware.Recover())
 	e.Use(middleware.RequestLogger())
@@ -55,5 +60,9 @@ func New(db *sql.DB) *echo.Echo {
 	g.PUT("/projects/:id/builder", s.writableProject(s.putBuilder), s.requireAuth, bodyLimit)
 	g.GET("/projects/:id/payments", s.listPayments, s.requireAuth)
 	g.PUT("/projects/:id/payments", s.writableProject(s.putPayments), s.requireAuth, bodyLimit)
+	g.GET("/projects/:id/attachments", s.listAttachments, s.requireAuth)
+	g.POST("/projects/:id/attachments", s.writableProject(s.uploadAttachment), s.requireAuth)
+	g.GET("/projects/:id/attachments/:aid", s.downloadAttachment, s.requireAuth)
+	g.DELETE("/projects/:id/attachments/:aid", s.writableProject(s.deleteAttachment), s.requireAuth)
 	return e
 }

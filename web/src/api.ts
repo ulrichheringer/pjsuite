@@ -249,3 +249,38 @@ export const getPayments = (projectId: string) =>
 
 export const savePayments = (projectId: string, plan: PaymentPlan) =>
   call(paymentsPath(projectId), json("PUT", plan), none);
+
+const attachmentSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  contentType: z.string(),
+  size: z.number(),
+  createdAt: z.string(),
+});
+
+export type Attachment = z.infer<typeof attachmentSchema>;
+
+export const maxAttachmentBytes = 20 * 1024 * 1024;
+export const attachmentExtensions = [".pdf", ".jpg", ".jpeg", ".png", ".zip"];
+export const attachmentTypeError = "Envie PDF, JPG, PNG ou ZIP.";
+export const attachmentSizeError = "Cada arquivo pode ter até 20 MB.";
+
+const attachmentsPath = (projectId: string) =>
+  `/api/projects/${encodeURIComponent(projectId)}/attachments`;
+
+export const attachmentUrl = (projectId: string, id: number) =>
+  `${attachmentsPath(projectId)}/${id}`;
+
+export const listAttachments = (projectId: string) =>
+  call(attachmentsPath(projectId), {}, async (res) =>
+    z.array(attachmentSchema).parse(await res.json()),
+  );
+
+export const uploadAttachment = (projectId: string, file: File) => {
+  const body = new FormData();
+  body.set("file", file);
+  return call(attachmentsPath(projectId), { method: "POST", body }, none);
+};
+
+export const deleteAttachment = (projectId: string, id: number) =>
+  call(attachmentUrl(projectId, id), { method: "DELETE" }, none);

@@ -13,16 +13,23 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"github.com/ulrichheringer/pjsuite/server/internal/api"
+	"github.com/ulrichheringer/pjsuite/server/internal/storage"
 	"github.com/ulrichheringer/pjsuite/server/internal/store"
 )
 
 func newServer(t *testing.T) *echo.Echo {
 	t.Helper()
-	e, _ := newServerDB(t)
+	e, _, _ := newServerAll(t)
 	return e
 }
 
 func newServerDB(t *testing.T) (*echo.Echo, *sql.DB) {
+	t.Helper()
+	e, db, _ := newServerAll(t)
+	return e, db
+}
+
+func newServerAll(t *testing.T) (*echo.Echo, *sql.DB, *storage.Memory) {
 	t.Helper()
 	db, err := store.Open(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
@@ -32,7 +39,8 @@ func newServerDB(t *testing.T) (*echo.Echo, *sql.DB) {
 	if err := store.Migrate(t.Context(), db); err != nil {
 		t.Fatal(err)
 	}
-	return api.New(db), db
+	files := storage.NewMemory()
+	return api.New(db, files), db, files
 }
 
 func TestHealth(t *testing.T) {
