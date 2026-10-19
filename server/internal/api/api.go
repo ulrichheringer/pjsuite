@@ -47,5 +47,11 @@ func New(db *sql.DB) *echo.Echo {
 	g.PUT("/projects/:id", s.putProject, s.requireAuth, bodyLimit)
 	g.POST("/projects/:id/archive", s.archiveProject, s.requireAuth)
 	g.POST("/projects/:id/duplicate", s.duplicateProject, s.requireAuth, bodyLimit)
+	g.GET("/projects/:id/stages", s.listStages, s.requireAuth)
+	g.POST("/projects/:id/stages", s.writableProject(s.createStage), s.requireAuth, bodyLimit)
+	g.PUT("/projects/:id/stages/order", s.writableProject(s.putStageOrder), s.requireAuth, bodyLimit)
+	g.PUT("/projects/:id/stages/:sid", s.writableProject(s.putStage), s.requireAuth, bodyLimit)
+	g.DELETE("/projects/:id/stages/:sid", s.writableProject(s.deleteStage), s.requireAuth)
+	g.PUT("/projects/:id/builder", s.writableProject(s.putBuilder), s.requireAuth, bodyLimit)
 	return e
 }

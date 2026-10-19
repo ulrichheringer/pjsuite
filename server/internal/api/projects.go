@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"net/http"
@@ -15,7 +16,7 @@ import (
 const (
 	maxProjectNameRunes = 120
 	maxReferenceRunes   = 40
-	projectSelect       = `SELECT p.id, p.client_id, c.name, p.name, p.area, p.reference, p.goal, p.structure, p.status, p.archived_at IS NOT NULL
+	projectSelect       = `SELECT p.id, p.client_id, c.name, p.name, p.area, p.reference, p.goal, p.structure, p.status, p.archived_at IS NOT NULL, p.scope, p.outcome, p.notes
 		FROM projects p JOIN clients c ON c.id = p.client_id`
 )
 
@@ -32,10 +33,13 @@ type project struct {
 	Structure  string `json:"structure"`
 	Status     string `json:"status"`
 	Archived   bool   `json:"archived"`
+	Scope      string `json:"scope"`
+	Outcome    string `json:"outcome"`
+	Notes      string `json:"notes"`
 }
 
 func (p *project) scan(row interface{ Scan(...any) error }) error {
-	return row.Scan(&p.ID, &p.ClientID, &p.ClientName, &p.Name, &p.Area, &p.Reference, &p.Goal, &p.Structure, &p.Status, &p.Archived)
+	return row.Scan(&p.ID, &p.ClientID, &p.ClientName, &p.Name, &p.Area, &p.Reference, &p.Goal, &p.Structure, &p.Status, &p.Archived, &p.Scope, &p.Outcome, &p.Notes)
 }
 
 func (p *project) normalize() {
@@ -114,13 +118,19 @@ func (s *server) createProject(c *echo.Context) error {
 	if len(errs) > 0 {
 		return invalid(c, http.StatusBadRequest, errs)
 	}
-	return s.insertProject(c, p)
+	return s.insertProject(c, p, seedStages(p.Structure))
 }
 
-func (s *server) insertProject(c *echo.Context, p project) error {
-	err := s.db.QueryRowContext(c.Request().Context(),
-		`INSERT INTO projects (user_id, client_id, name, area, reference, goal, structure) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`,
-		userIDOf(c), p.ClientID, p.Name, p.Area, p.Reference, p.Goal, p.Structure).Scan(&p.ID)
+func (s *server) insertProject(c *echo.Context, p project, populate func(ctx context.Context, tx *sql.Tx, projectID int64) error) error {
+	err := s.inTx(c, func(ctx context.Context, tx *sql.Tx) error {
+		err := tx.QueryRowContext(ctx,
+			`INSERT INTO projects (user_id, client_id, name, area, reference, goal, structure, scope, outcome, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+			userIDOf(c), p.ClientID, p.Name, p.Area, p.Reference, p.Goal, p.Structure, p.Scope, p.Outcome, p.Notes).Scan(&p.ID)
+		if err != nil || populate == nil {
+			return err
+		}
+		return populate(ctx, tx, p.ID)
+	})
 	if err != nil {
 		return err
 	}
@@ -207,7 +217,10 @@ func (s *server) duplicateProject(c *echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return echo.ErrBadRequest
 	}
-	p := project{ClientID: req.ClientID, Name: strings.TrimSpace(req.Name), Area: src.Area, Goal: src.Goal, Structure: src.Structure}
+	p := project{
+		ClientID: req.ClientID, Name: strings.TrimSpace(req.Name), Area: src.Area, Goal: src.Goal, Structure: src.Structure,
+		Scope: src.Scope, Outcome: src.Outcome, Notes: src.Notes,
+	}
 	if p.ClientID == 0 {
 		p.ClientID = src.ClientID
 	}
@@ -224,5 +237,16 @@ func (s *server) duplicateProject(c *echo.Context) error {
 	if len(errs) > 0 {
 		return invalid(c, http.StatusBadRequest, errs)
 	}
-	return s.insertProject(c, p)
+	srcStages, err := s.loadStages(c.Request().Context(), src.ID)
+	if err != nil {
+		return err
+	}
+	return s.insertProject(c, p, func(ctx context.Context, tx *sql.Tx, projectID int64) error {
+		for _, st := range srcStages {
+			if _, err := insertStage(ctx, tx, projectID, st.input()); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }

@@ -23,7 +23,6 @@ function EditProjectPage() {
   const [clients, setClients] = useState<Pick<Client, "id" | "name">[]>([]);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [failed, setFailed] = useState(false);
-  const [confirmed, setConfirmed] = useState(false);
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
@@ -67,9 +66,9 @@ function EditProjectPage() {
     const outcome = await updateProject(id, { clientId, name, area, reference, goal });
     setPending(false);
     if (outcome.kind === "unauthorized") return navigate({ to: "/entrar" });
+    if (outcome.kind === "ok") return navigate({ to: "/projetos/$id/montagem", params: { id } });
     setErrors(outcome.kind === "invalid" ? outcome.errors : {});
     setFailed(outcome.kind === "failed");
-    setConfirmed(outcome.kind === "ok");
   }
 
   return (
@@ -98,17 +97,13 @@ function EditProjectPage() {
             Projetos arquivados ficam somente para consulta.
           </Banner>
         )}
-        {confirmed && <Banner title="Projeto salvo." tone="success" />}
         <form className="form-surface project-start-form" onSubmit={submit} noValidate>
           <ProjectFields
             value={form}
             errors={errors}
             clients={clients}
             disabled={project.archived}
-            onChange={(next) => {
-              setConfirmed(false);
-              setForm(next);
-            }}
+            onChange={setForm}
           />
           <Banner title="Alterações comerciais geram uma nova versão.">
             Contratos já assinados permanecem preservados.

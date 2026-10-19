@@ -57,7 +57,7 @@ Social login, plans/billing, marketplace, templates marketplace, automated email
 - [x] Account: sessions migration, signup/login/logout/me endpoints, login + signup + profile screens, authenticated app shell
 - [x] Clients: schema, CRUD + archive, clients board, create/edit/archive screens
 - [x] Projects: schema, CRUD + duplicate + archive, projects list, create/edit screens
-- [ ] Builder structure: stages, tasks, deliverables, deadlines
+- [x] Builder structure: stages, tasks, deliverables, deadlines
 - [ ] Builder commercial: price, payment plan
 - [ ] Builder attachments: R2 upload behind a storage interface (in-memory fake in tests), 20 MB limit, pdf/jpg/png/zip
 - [ ] Visibility + contract: block visibility, client preview, contract version 1, PDF view

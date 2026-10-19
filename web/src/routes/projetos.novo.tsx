@@ -37,7 +37,9 @@ function NewProjectPage() {
     const outcome = await createProject(form);
     setPending(false);
     if (outcome.kind === "unauthorized") return navigate({ to: "/entrar" });
-    if (outcome.kind === "ok") return navigate({ to: "/projetos", search: { criado: true } });
+    if (outcome.kind === "ok") {
+      return navigate({ to: "/projetos/$id/montagem", params: { id: String(outcome.value.id) } });
+    }
     setErrors(outcome.kind === "invalid" ? outcome.errors : {});
     setFailed(outcome.kind === "failed");
   }

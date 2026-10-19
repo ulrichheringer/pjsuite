@@ -32,13 +32,10 @@ import { ClientSelect } from "@/project-fields";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge, Banner, Blank, Button, Field, Loading } from "@/ui";
 
-export const Route = createFileRoute("/projetos/")({
-  component: ProjectsPage,
-  validateSearch: (search): { criado?: true } => (search.criado ? { criado: true } : {}),
-});
+export const Route = createFileRoute("/projetos/")({ component: ProjectsPage });
 
 function ProjectsPage() {
-  const [created, setCreated] = useState(!!Route.useSearch().criado);
+  const [created, setCreated] = useState(false);
   const [toDuplicate, setToDuplicate] = useState<Project>();
   const navigate = useNavigate();
   const [active, setActive] = useState<Project[]>();

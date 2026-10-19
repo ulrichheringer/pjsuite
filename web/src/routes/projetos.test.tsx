@@ -16,6 +16,9 @@ const project = (id: number, name: string, clientName: string, extra = {}) => ({
   structure: "essential",
   status: "draft",
   archived: false,
+  scope: "",
+  outcome: "",
+  notes: "",
   ...extra,
 });
 
@@ -111,7 +114,7 @@ test("new project form offers only active clients and posts the structure", asyn
   await user.type(screen.getByLabelText(/Referência interna/), "PJ-9");
   await user.click(screen.getByRole("button", { name: /Criar e montar projeto/ }));
 
-  await vi.waitFor(() => expect(router.state.location.pathname).toBe("/projetos"));
+  await vi.waitFor(() => expect(router.state.location.pathname).toBe("/projetos/9/montagem"));
   const post = fetchSpy.mock.calls.find(([, init]) => init?.method === "POST")!;
   expect(post[0]).toBe("/api/projects");
   expect(JSON.parse(String(post[1]?.body))).toMatchObject({
@@ -120,7 +123,7 @@ test("new project form offers only active clients and posts the structure", asyn
     structure: "suggested",
     reference: "PJ-9",
   });
-  expect(await screen.findByText("Projeto criado.")).toBeInTheDocument();
+  expect(router.state.location.search).toEqual({});
 });
 
 test("new project form defaults to the essential structure", async () => {
@@ -190,7 +193,7 @@ test("edit form saves the changes without the structure", async () => {
   const fetchSpy = editRoutes((_, init) =>
     init?.method === "PUT" ? jsonResponse(204) : undefined,
   );
-  renderAt("/projetos/5");
+  const router = renderAt("/projetos/5");
   const user = userEvent.setup();
   const name = await screen.findByLabelText(/Nome do projeto/);
   await vi.waitFor(() => expect(screen.getByLabelText("Cliente")).toHaveValue("2"));
@@ -198,7 +201,7 @@ test("edit form saves the changes without the structure", async () => {
   await user.type(name, "Marca nova");
   await user.selectOptions(screen.getByLabelText("Cliente"), "Ana Lima");
   await user.click(screen.getByRole("button", { name: "Salvar alterações" }));
-  expect(await screen.findByText("Projeto salvo.")).toBeInTheDocument();
+  await vi.waitFor(() => expect(router.state.location.pathname).toBe("/projetos/5/montagem"));
   const put = fetchSpy.mock.calls.find(([, init]) => init?.method === "PUT")!;
   expect(put[0]).toBe("/api/projects/5");
   const body = JSON.parse(String(put[1]?.body));
