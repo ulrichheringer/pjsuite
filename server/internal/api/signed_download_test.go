@@ -65,14 +65,10 @@ func TestSignedDownloadsRedirectWhenStoreSigns(t *testing.T) {
 	file := publishedFile(t, e, path, "briefing.pdf", data, a)
 	portalURL := "/api/portal/" + l.Token + "/deliveries/1/files/" + strconv.Itoa(file.ID)
 	assertRedirect(t, get(e, portalURL), "briefing.pdf", "application/pdf")
-	if rec := get(e, "/api/portal/wrong/deliveries/1/files/"+strconv.Itoa(file.ID)); rec.Header().Get("Location") != "" {
-		t.Fatalf("invalid token redirected: %d %v", rec.Code, rec.Header())
-	}
+	assertNotRedirected(t, get(e, "/api/portal/wrong/deliveries/1/files/"+strconv.Itoa(file.ID)))
 
 	if _, err := db.ExecContext(t.Context(), `UPDATE projects SET archived_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE status = 'signed'`); err != nil {
 		t.Fatal(err)
 	}
-	if rec := get(e, portalURL); rec.Header().Get("Location") != "" {
-		t.Fatalf("archived project redirected: %d %v", rec.Code, rec.Header())
-	}
+	assertNotRedirected(t, get(e, portalURL))
 }
