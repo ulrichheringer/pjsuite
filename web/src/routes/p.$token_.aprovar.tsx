@@ -70,7 +70,9 @@ function ApproveForm({
   return (
     <form className="surface" onSubmit={submit}>
       <h1>Aprovar entrega</h1>
-      <p>{`Entrega ${delivery.number} · ${delivery.title}`}</p>
+      <div className="context-card">
+        <strong>{`Entrega ${delivery.number} · ${delivery.title}`}</strong>
+      </div>
       {failed === "error" && (
         <Banner title="Não foi possível registrar a aprovação." tone="danger">
           Tente novamente em instantes.

@@ -60,6 +60,15 @@ END;
 -- +goose StatementEnd
 
 -- +goose StatementBegin
+CREATE TRIGGER stage_files_delete_not_completed BEFORE DELETE ON stage_files
+WHEN (SELECT p.completed_at FROM stages s JOIN projects p ON p.id = s.project_id WHERE s.id = OLD.stage_id) IS NOT NULL
+ AND EXISTS (SELECT 1 FROM stages WHERE id = OLD.stage_id)
+BEGIN
+    SELECT RAISE(ABORT, 'completed projects are frozen');
+END;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
 CREATE TRIGGER deliveries_not_completed BEFORE INSERT ON deliveries
 WHEN (SELECT completed_at FROM projects WHERE id = NEW.project_id) IS NOT NULL
 BEGIN
@@ -93,6 +102,7 @@ END;
 -- +goose StatementEnd
 
 -- +goose Down
+DROP TRIGGER stage_files_delete_not_completed;
 DROP TRIGGER delivery_files_delete_not_completed;
 DROP TRIGGER delivery_files_insert_not_completed;
 DROP TRIGGER deliveries_publish_not_completed;

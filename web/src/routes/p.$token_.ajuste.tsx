@@ -58,7 +58,9 @@ function AdjustForm({
   return (
     <form className="surface" onSubmit={submit}>
       <h1>Solicitar ajuste</h1>
-      <p>{`Entrega ${delivery.number} · ${delivery.title}`}</p>
+      <div className="context-card">
+        <strong>{`Entrega ${delivery.number} · ${delivery.title}`}</strong>
+      </div>
       {failed === "error" && (
         <Banner title="Não foi possível enviar o pedido." tone="danger">
           Tente novamente em instantes.

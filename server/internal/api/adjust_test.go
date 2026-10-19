@@ -202,6 +202,10 @@ func TestAdjustDBRestrictsResponsesAndFreezesCompleted(t *testing.T) {
 	if exec(approveFirst) == nil {
 		t.Error("response accepted on a superseded delivery")
 	}
+	const addStageFile = `INSERT INTO stage_files (stage_id, key, name, content_type, size) SELECT id, 'k' || id, 'a.pdf', 'application/pdf', 1 FROM stages`
+	if err := exec(addStageFile); err != nil {
+		t.Fatalf("stage file: %v", err)
+	}
 	if err := exec(`UPDATE projects SET completed_at = '2026-02-01T00:00:00Z'`); err != nil {
 		t.Fatalf("complete: %v", err)
 	}
@@ -210,7 +214,8 @@ func TestAdjustDBRestrictsResponsesAndFreezesCompleted(t *testing.T) {
 	}
 	for _, q := range []string{
 		`UPDATE stages SET status = 'in_progress'`,
-		`INSERT INTO stage_files (stage_id, key, name, content_type, size) SELECT id, 'k' || id, 'a.pdf', 'application/pdf', 1 FROM stages`,
+		addStageFile,
+		`DELETE FROM stage_files`,
 		addDraft,
 		addFile,
 		`DELETE FROM delivery_files WHERE delivery_id IN (SELECT id FROM deliveries WHERE published_at IS NULL)`,

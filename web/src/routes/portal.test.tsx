@@ -474,7 +474,8 @@ test("the adjust form posts the request against the latest delivery", async () =
   );
   renderAt("/p/TOK/ajuste");
 
-  expect(await screen.findByText("Entrega 2 · Ajustes finais")).toBeVisible();
+  const summary = await screen.findByText("Entrega 2 · Ajustes finais");
+  expect(summary.closest(".context-card")).not.toBeNull();
   await userEvent.type(screen.getByLabelText(/Qual ajuste/), "Aumentar o logo no topo.");
   await userEvent.click(screen.getByRole("button", { name: "Enviar pedido de ajuste" }));
 
@@ -530,6 +531,9 @@ test("the approve screen requires the confirmation and shows the receipt", async
       : jsonResponse(400, { errors: { confirm: "Confirme a aprovação." } });
   });
   renderAt("/p/TOK/aprovar");
+
+  const summary = await screen.findByText("Entrega 2 · Ajustes finais");
+  expect(summary.closest(".context-card")).not.toBeNull();
 
   await userEvent.click(await screen.findByRole("button", { name: "Aprovar entrega" }));
   expect(await screen.findByText("Confirme a aprovação.")).toBeVisible();
