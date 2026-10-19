@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { signContract, type FieldErrors, type Portal, type Receipt } from "@/api";
+import { getPortal, signContract, type FieldErrors, type Portal, type Receipt } from "@/api";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ContractPaper } from "@/contract-paper";
 import { PortalPage, ReceiptCard } from "@/portal";
@@ -23,14 +23,15 @@ function SignPage() {
   );
 }
 
-function SignForm({ token, portal }: { token: string; portal: Portal }) {
+function SignForm({ token, portal: initial }: { token: string; portal: Portal }) {
+  const [portal, setPortal] = useState(initial);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [consent, setConsent] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [failure, setFailure] = useState<Failure>("none");
   const [pending, setPending] = useState(false);
-  const [receipt, setReceipt] = useState<Receipt | null>(portal.signature);
+  const [receipt, setReceipt] = useState<Receipt | null>(initial.signature);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -44,7 +45,10 @@ function SignForm({ token, portal }: { token: string; portal: Portal }) {
     const conflict =
       (outcome.kind === "invalid" || outcome.kind === "failed") && outcome.status === 409;
     if (!conflict) return setFailure("error");
-    setFailure(outcome.kind === "failed" ? "stale" : "closed");
+    if (outcome.kind === "invalid") return setFailure("closed");
+    setFailure("stale");
+    const fresh = await getPortal(token);
+    if (fresh.kind === "ok") setPortal(fresh.value);
   }
 
   if (receipt) {

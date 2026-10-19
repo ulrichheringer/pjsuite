@@ -241,6 +241,42 @@ test("the sign screen explains a stale version and a closed contract", async () 
   expect(await screen.findByText("Este contrato não pode mais ser assinado.")).toBeVisible();
 });
 
+test("after a stale version the sign screen loads the new version and retries with it", async () => {
+  let loads = 0;
+  const spy = mockFetch((path, init) => {
+    if (path === "/api/portal/TOK" && !init?.method)
+      return jsonResponse(200, { ...portal("viewed"), version: ++loads });
+    if (path === "/api/portal/TOK/sign" && init?.method === "POST") {
+      const { version } = JSON.parse(String(init.body));
+      return version === 1
+        ? jsonResponse(409, { error: "stale_version" })
+        : jsonResponse(200, {
+            name: "Ana Lima",
+            email: "ana@example.com",
+            version,
+            hash: "abc",
+            signedAt: "2026-10-18T12:00:00Z",
+          });
+    }
+    return jsonResponse(500);
+  });
+  renderAt("/p/TOK/assinar");
+
+  await userEvent.type(await screen.findByLabelText(/Nome completo/), "Ana Lima");
+  await userEvent.type(screen.getByLabelText(/E-mail/), "ana@example.com");
+  await userEvent.click(screen.getByRole("checkbox"));
+  await userEvent.click(screen.getByRole("button", { name: /Assinar/ }));
+  expect(await screen.findByText("Uma nova versão foi publicada.")).toBeVisible();
+  expect(await screen.findByRole("heading", { name: "Assinar versão 2" })).toBeVisible();
+
+  await userEvent.click(screen.getByRole("button", { name: /Assinar/ }));
+  expect(await screen.findByText("Recibo demonstrativo")).toBeVisible();
+  const versions = spy.mock.calls
+    .filter(([path]) => path === "/api/portal/TOK/sign")
+    .map(([, init]) => JSON.parse(String(init?.body)).version);
+  expect(versions).toEqual([1, 2]);
+});
+
 test("the sign screen shows a banner when the server fails", async () => {
   portalRoutes("viewed");
   renderAt("/p/TOK/assinar");
