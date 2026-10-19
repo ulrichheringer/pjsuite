@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/labstack/echo/v5"
 )
 
 func projectIDOf(path string) int64 {
@@ -197,4 +199,90 @@ func TestPortalEventsExposeSharedOnlyThroughClientDTO(t *testing.T) {
 	assertLinkInvalid(t, get(e, "/api/portal/desconhecido/events"))
 	send(e, http.MethodPost, path+"/archive", nil, a)
 	assertLinkInvalid(t, get(e, portal+"/events"))
+}
+
+type notificationsJSON struct {
+	Unread int `json:"unread"`
+	Items  []struct {
+		ID          int    `json:"id"`
+		ProjectID   int    `json:"projectId"`
+		ProjectName string `json:"projectName"`
+		Kind        string `json:"kind"`
+		ActorName   string `json:"actorName"`
+		Number      int    `json:"number"`
+		Message     string `json:"message"`
+		CreatedAt   string `json:"createdAt"`
+		Read        bool   `json:"read"`
+	} `json:"items"`
+}
+
+func notificationsOf(t *testing.T, e *echo.Echo, a *http.Cookie) notificationsJSON {
+	t.Helper()
+	rec := get(e, "/api/notifications", a)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("notifications = %d %s", rec.Code, rec.Body)
+	}
+	var got notificationsJSON
+	decode(t, rec, &got)
+	return got
+}
+
+func TestNotificationsListClientEventsAndTrackReadState(t *testing.T) {
+	e := newServer(t)
+	a := signedUp(t, e)
+	path, l := finalizedShare(t, e, a)
+	b := signedUpAs(t, e, "bruno@example.com")
+	bPath, bl := finalizedShare(t, e, b)
+
+	if got := notificationsOf(t, e, a); got.Unread != 0 || got.Items == nil || len(got.Items) != 0 {
+		t.Fatalf("empty = %+v", got)
+	}
+
+	portal := "/api/portal/" + l.Token
+	get(e, portal)
+	send(e, http.MethodPost, portal+"/change", map[string]string{"message": "Trocar prazo"}, nil)
+	send(e, http.MethodPost, "/api/portal/"+bl.Token+"/refuse", map[string]string{}, nil)
+
+	got := notificationsOf(t, e, a)
+	if got.Unread != 2 || len(got.Items) != 2 || got.Items[0].Kind != "change_requested" || got.Items[1].Kind != "client_viewed" {
+		t.Fatalf("list = %+v", got)
+	}
+	first := got.Items[0]
+	if first.ProjectID != int(projectIDOf(path)) || first.ProjectName != "Ensaio" || first.ActorName != "Ana" || first.Number != 1 || first.Message != "Trocar prazo" || first.CreatedAt == "" || first.Read {
+		t.Fatalf("first = %+v", first)
+	}
+	if other := notificationsOf(t, e, b); other.Unread != 1 || len(other.Items) != 1 || other.Items[0].Kind != "refused" || other.Items[0].ProjectID != int(projectIDOf(bPath)) {
+		t.Fatalf("other user = %+v", other)
+	}
+
+	id := strconv.Itoa(got.Items[1].ID)
+	if rec := send(e, http.MethodPost, "/api/notifications/"+id+"/read", nil, b); rec.Code != http.StatusNotFound {
+		t.Errorf("read other user's = %d", rec.Code)
+	}
+	if rec := send(e, http.MethodPost, "/api/notifications/999/read", nil, a); rec.Code != http.StatusNotFound {
+		t.Errorf("read unknown = %d", rec.Code)
+	}
+	for i := range 2 {
+		if rec := send(e, http.MethodPost, "/api/notifications/"+id+"/read", nil, a); rec.Code != http.StatusNoContent {
+			t.Fatalf("read %d = %d %s", i, rec.Code, rec.Body)
+		}
+	}
+	got = notificationsOf(t, e, a)
+	if got.Unread != 1 || got.Items[0].Read || !got.Items[1].Read {
+		t.Fatalf("after read = %+v", got)
+	}
+
+	if rec := send(e, http.MethodPost, "/api/notifications/read-all", nil, a); rec.Code != http.StatusNoContent {
+		t.Fatalf("read-all = %d", rec.Code)
+	}
+	if got = notificationsOf(t, e, a); got.Unread != 0 || !got.Items[0].Read {
+		t.Fatalf("after read-all = %+v", got)
+	}
+	if other := notificationsOf(t, e, b); other.Unread != 1 {
+		t.Fatalf("other user read-all leak = %+v", other)
+	}
+
+	if rec := get(e, "/api/notifications"); rec.Code != http.StatusUnauthorized {
+		t.Errorf("anonymous = %d", rec.Code)
+	}
 }
