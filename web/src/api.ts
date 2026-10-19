@@ -295,6 +295,66 @@ export const uploadAttachment = (projectId: string, file: File) => {
 export const deleteAttachment = (projectId: string, id: number) =>
   call(attachmentUrl(projectId, id), { method: "DELETE" }, none);
 
+const stageStatusSchema = z.enum(["pending", "in_progress", "done"]);
+
+export type StageStatus = z.infer<typeof stageStatusSchema>;
+
+export const stageStatusLabels = {
+  pending: "Pendente",
+  in_progress: "Em andamento",
+  done: "Concluída",
+} as const satisfies Record<StageStatus, string>;
+
+const executionStageSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  timing: z.string(),
+  deliverable: z.string(),
+  status: stageStatusSchema,
+  tasks: z.array(z.object({ id: z.number(), title: z.string(), done: z.boolean() })),
+  files: z.array(attachmentSchema),
+});
+
+export type ExecutionStage = z.infer<typeof executionStageSchema>;
+export type ExecutionTask = ExecutionStage["tasks"][number];
+
+const projectPath = (projectId: string) => `/api/projects/${encodeURIComponent(projectId)}`;
+
+export const getExecution = (projectId: string) =>
+  call(`${projectPath(projectId)}/execution`, {}, async (res) =>
+    z.array(executionStageSchema).parse(await res.json()),
+  );
+
+export const setStageStatus = (projectId: string, stageId: number, status: StageStatus) =>
+  call(`${stagePath(projectId)}/${stageId}/status`, json("PUT", { status }), none);
+
+export const addTask = (projectId: string, stageId: number, title: string) =>
+  call(`${stagePath(projectId)}/${stageId}/tasks`, json("POST", { title }), none);
+
+export const updateTask = (
+  projectId: string,
+  taskId: number,
+  patch: Partial<Pick<ExecutionTask, "title" | "done">>,
+) => call(`${projectPath(projectId)}/tasks/${taskId}`, json("PUT", patch), none);
+
+export const deleteTask = (projectId: string, taskId: number) =>
+  call(`${projectPath(projectId)}/tasks/${taskId}`, { method: "DELETE" }, none);
+
+const stageFilesPath = (projectId: string, stageId: number) =>
+  `${stagePath(projectId)}/${stageId}/files`;
+
+export const stageFileUrl = (projectId: string, stageId: number, id: number) =>
+  `${stageFilesPath(projectId, stageId)}/${id}`;
+
+export const uploadStageFile = (projectId: string, stageId: number, file: File) => {
+  const body = new FormData();
+  body.set("file", file);
+  return call(stageFilesPath(projectId, stageId), { method: "POST", body }, none);
+};
+
+export const deleteStageFile = (projectId: string, stageId: number, id: number) =>
+  call(stageFileUrl(projectId, stageId, id), { method: "DELETE" }, none);
+
 export const visibilityBlocks = [
   "scope",
   "stages",
@@ -438,6 +498,7 @@ const portalSchema = z.object({
   status: projectSchema.shape.status,
   content: clientViewSchema,
   signature: receiptSchema.nullable(),
+  progress: z.array(z.object({ name: z.string(), status: stageStatusSchema })).optional(),
 });
 
 export type Portal = z.infer<typeof portalSchema>;
