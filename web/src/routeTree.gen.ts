@@ -20,6 +20,7 @@ import { Route as PTokenRouteImport } from './routes/p.$token'
 import { Route as ProjetosIndexRouteImport } from './routes/projetos.index'
 import { Route as ProjetosIdRouteImport } from './routes/projetos.$id'
 import { Route as ProjetosNovoRouteImport } from './routes/projetos.novo'
+import { Route as PTokenAcompanharRouteImport } from './routes/p.$token_.acompanhar'
 import { Route as PTokenAlteracaoRouteImport } from './routes/p.$token_.alteracao'
 import { Route as PTokenAssinarRouteImport } from './routes/p.$token_.assinar'
 import { Route as PTokenRecusarRouteImport } from './routes/p.$token_.recusar'
@@ -86,6 +87,11 @@ const ProjetosNovoRoute = ProjetosNovoRouteImport.update({
   path: '/projetos/novo',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PTokenAcompanharRoute = PTokenAcompanharRouteImport.update({
+  id: '/p/$token_/acompanhar',
+  path: '/p/$token/acompanhar',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PTokenAlteracaoRoute = PTokenAlteracaoRouteImport.update({
   id: '/p/$token_/alteracao',
   path: '/p/$token/alteracao',
@@ -150,6 +156,7 @@ export interface FileRoutesByFullPath {
   '/projetos/novo': typeof ProjetosNovoRoute
   '/clientes/': typeof ClientesIndexRoute
   '/projetos/': typeof ProjetosIndexRoute
+  '/p/$token/acompanhar': typeof PTokenAcompanharRoute
   '/p/$token/alteracao': typeof PTokenAlteracaoRoute
   '/p/$token/assinar': typeof PTokenAssinarRoute
   '/p/$token/recusar': typeof PTokenRecusarRoute
@@ -173,6 +180,7 @@ export interface FileRoutesByTo {
   '/projetos/novo': typeof ProjetosNovoRoute
   '/clientes': typeof ClientesIndexRoute
   '/projetos': typeof ProjetosIndexRoute
+  '/p/$token/acompanhar': typeof PTokenAcompanharRoute
   '/p/$token/alteracao': typeof PTokenAlteracaoRoute
   '/p/$token/assinar': typeof PTokenAssinarRoute
   '/p/$token/recusar': typeof PTokenRecusarRoute
@@ -197,6 +205,7 @@ export interface FileRoutesById {
   '/projetos/novo': typeof ProjetosNovoRoute
   '/clientes/': typeof ClientesIndexRoute
   '/projetos/': typeof ProjetosIndexRoute
+  '/p/$token_/acompanhar': typeof PTokenAcompanharRoute
   '/p/$token_/alteracao': typeof PTokenAlteracaoRoute
   '/p/$token_/assinar': typeof PTokenAssinarRoute
   '/p/$token_/recusar': typeof PTokenRecusarRoute
@@ -222,6 +231,7 @@ export interface FileRouteTypes {
     | '/projetos/novo'
     | '/clientes/'
     | '/projetos/'
+    | '/p/$token/acompanhar'
     | '/p/$token/alteracao'
     | '/p/$token/assinar'
     | '/p/$token/recusar'
@@ -245,6 +255,7 @@ export interface FileRouteTypes {
     | '/projetos/novo'
     | '/clientes'
     | '/projetos'
+    | '/p/$token/acompanhar'
     | '/p/$token/alteracao'
     | '/p/$token/assinar'
     | '/p/$token/recusar'
@@ -268,6 +279,7 @@ export interface FileRouteTypes {
     | '/projetos/novo'
     | '/clientes/'
     | '/projetos/'
+    | '/p/$token_/acompanhar'
     | '/p/$token_/alteracao'
     | '/p/$token_/assinar'
     | '/p/$token_/recusar'
@@ -292,6 +304,7 @@ export interface RootRouteChildren {
   ProjetosNovoRoute: typeof ProjetosNovoRoute
   ClientesIndexRoute: typeof ClientesIndexRoute
   ProjetosIndexRoute: typeof ProjetosIndexRoute
+  PTokenAcompanharRoute: typeof PTokenAcompanharRoute
   PTokenAlteracaoRoute: typeof PTokenAlteracaoRoute
   PTokenAssinarRoute: typeof PTokenAssinarRoute
   PTokenRecusarRoute: typeof PTokenRecusarRoute
@@ -383,6 +396,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjetosNovoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/p/$token_/acompanhar': {
+      id: '/p/$token_/acompanhar'
+      path: '/p/$token/acompanhar'
+      fullPath: '/p/$token/acompanhar'
+      preLoaderRoute: typeof PTokenAcompanharRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/p/$token_/alteracao': {
       id: '/p/$token_/alteracao'
       path: '/p/$token/alteracao'
@@ -468,6 +488,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProjetosNovoRoute: ProjetosNovoRoute,
   ClientesIndexRoute: ClientesIndexRoute,
   ProjetosIndexRoute: ProjetosIndexRoute,
+  PTokenAcompanharRoute: PTokenAcompanharRoute,
   PTokenAlteracaoRoute: PTokenAlteracaoRoute,
   PTokenAssinarRoute: PTokenAssinarRoute,
   PTokenRecusarRoute: PTokenRecusarRoute,

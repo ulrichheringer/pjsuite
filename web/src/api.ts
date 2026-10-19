@@ -301,8 +301,8 @@ export type StageStatus = z.infer<typeof stageStatusSchema>;
 
 export const stageStatusLabels = {
   pending: "Pendente",
-  in_progress: "Em andamento",
-  done: "Concluída",
+  in_progress: "Em execução",
+  done: "Concluído",
 } as const satisfies Record<StageStatus, string>;
 
 const executionStageSchema = z.object({
