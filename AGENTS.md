@@ -26,6 +26,7 @@ All from repo root (pnpm workspaces `web`, `server`; tasks run via `vp run`; `pn
 - UI: only tokens from `web/public/tokens.json`/`web/src/globals.css` and components from `web/src/components/ui` + `web/src/ui.tsx`; no ad-hoc colors, spacing, fonts. Reference: `design/DESIGN.md`, `design/SCREEN-SPECS.md`, `design/prototype/product.tsx`.
 - Light mode only. Professional operates the app; client uses a link portal, no client account.
 - Signed contract versions are immutable; edits create a new version. Internal tasks/notes never reach client views.
+- Client-visible data is built only by `buildClientView` (`server/internal/api/clientview.go`); contract versions are stored snapshots of it (`contract_versions`), never recomputed from live data.
 - SQLite only; single connection, WAL, foreign keys on. Schema changes: new goose SQL file in `server/migrations/` (embedded, auto-applied on start).
 
 ## Skills
