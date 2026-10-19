@@ -3,13 +3,17 @@ package api
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
 	"errors"
 	"io"
+	"io/fs"
 	"log/slog"
+	"mime"
 	"net/http"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/labstack/echo/v5"
@@ -109,4 +113,42 @@ func (s *server) listAttachments(c *echo.Context) error {
 		return err
 	}
 	return c.JSON(http.StatusOK, list)
+}
+
+func (s *server) findAttachment(c *echo.Context, p project) (a attachment, key string, err error) {
+	id, err := strconv.ParseInt(c.Param("aid"), 10, 64)
+	if err != nil {
+		return a, "", echo.ErrNotFound
+	}
+	err = s.db.QueryRowContext(c.Request().Context(),
+		`SELECT id, key, name, content_type, size, created_at FROM attachments WHERE id = ? AND project_id = ?`, id, p.ID).
+		Scan(&a.ID, &key, &a.Name, &a.ContentType, &a.Size, &a.CreatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return a, "", echo.ErrNotFound
+	}
+	return a, key, err
+}
+
+func (s *server) downloadAttachment(c *echo.Context) error {
+	p, err := s.findProject(c)
+	if err != nil {
+		return err
+	}
+	a, key, err := s.findAttachment(c, p)
+	if err != nil {
+		return err
+	}
+	object, err := s.files.Get(c.Request().Context(), key)
+	if errors.Is(err, fs.ErrNotExist) {
+		return echo.ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	defer object.Close()
+	h := c.Response().Header()
+	h.Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": a.Name}))
+	h.Set("X-Content-Type-Options", "nosniff")
+	h.Set("Content-Length", strconv.FormatInt(a.Size, 10))
+	return c.Stream(http.StatusOK, a.ContentType, object)
 }

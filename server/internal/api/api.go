@@ -62,5 +62,6 @@ func New(db *sql.DB, files storage.Store) *echo.Echo {
 	g.PUT("/projects/:id/payments", s.writableProject(s.putPayments), s.requireAuth, bodyLimit)
 	g.GET("/projects/:id/attachments", s.listAttachments, s.requireAuth)
 	g.POST("/projects/:id/attachments", s.writableProject(s.uploadAttachment), s.requireAuth)
+	g.GET("/projects/:id/attachments/:aid", s.downloadAttachment, s.requireAuth)
 	return e
 }

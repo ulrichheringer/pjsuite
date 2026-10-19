@@ -2,9 +2,11 @@ package api_test
 
 import (
 	"bytes"
+	"mime"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -140,5 +142,39 @@ func TestAttachmentUploadScopedAndWritable(t *testing.T) {
 	}
 	if files.Len() != 0 {
 		t.Fatal("rejected upload left data behind")
+	}
+}
+
+func TestAttachmentDownloadStreamsOriginalBytes(t *testing.T) {
+	e, _ := newAttachmentServer(t)
+	a := signedUp(t, e)
+	b := signedUpAs(t, e, "bruno@example.com")
+	path := blankProject(t, e, a)
+	data := attachmentSamples["briefing.pdf"]
+	var created attachmentJSON
+	decode(t, upload(e, path, "file", "briefing.pdf", data, a), &created)
+	url := path + "/attachments/" + strconv.Itoa(created.ID)
+	rec := get(e, url, a)
+	if rec.Code != http.StatusOK || !bytes.Equal(rec.Body.Bytes(), data) {
+		t.Fatalf("download = %d %q", rec.Code, rec.Body)
+	}
+	if got := rec.Header().Get("Content-Type"); got != "application/pdf" {
+		t.Fatalf("Content-Type = %q", got)
+	}
+	kind, params, err := mime.ParseMediaType(rec.Header().Get("Content-Disposition"))
+	if err != nil || kind != "attachment" || params["filename"] != "briefing.pdf" {
+		t.Fatalf("Content-Disposition = %q", rec.Header().Get("Content-Disposition"))
+	}
+	if got := rec.Header().Get("X-Content-Type-Options"); got != "nosniff" {
+		t.Fatalf("X-Content-Type-Options = %q", got)
+	}
+	if rec := get(e, url, b); rec.Code != http.StatusNotFound {
+		t.Fatalf("other user = %d", rec.Code)
+	}
+	if rec := get(e, path+"/attachments", b); rec.Code != http.StatusNotFound {
+		t.Fatalf("other user list = %d", rec.Code)
+	}
+	if rec := get(e, path+"/attachments/999", a); rec.Code != http.StatusNotFound {
+		t.Fatalf("missing = %d", rec.Code)
 	}
 }
