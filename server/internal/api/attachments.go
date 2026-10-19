@@ -152,3 +152,18 @@ func (s *server) downloadAttachment(c *echo.Context) error {
 	h.Set("Content-Length", strconv.FormatInt(a.Size, 10))
 	return c.Stream(http.StatusOK, a.ContentType, object)
 }
+
+func (s *server) deleteAttachment(c *echo.Context, p project) error {
+	a, key, err := s.findAttachment(c, p)
+	if err != nil {
+		return err
+	}
+	ctx := c.Request().Context()
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM attachments WHERE id = ?`, a.ID); err != nil {
+		return err
+	}
+	if err := s.files.Delete(context.WithoutCancel(ctx), key); err != nil {
+		slog.Error("delete attachment object", "key", key, "err", err)
+	}
+	return c.NoContent(http.StatusNoContent)
+}

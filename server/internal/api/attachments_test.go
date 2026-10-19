@@ -178,3 +178,51 @@ func TestAttachmentDownloadStreamsOriginalBytes(t *testing.T) {
 		t.Fatalf("missing = %d", rec.Code)
 	}
 }
+
+func TestAttachmentDeleteRemovesRowAndObject(t *testing.T) {
+	e, files := newAttachmentServer(t)
+	a := signedUp(t, e)
+	b := signedUpAs(t, e, "bruno@example.com")
+	path := blankProject(t, e, a)
+	var created attachmentJSON
+	decode(t, upload(e, path, "file", "briefing.pdf", attachmentSamples["briefing.pdf"], a), &created)
+	url := path + "/attachments/" + strconv.Itoa(created.ID)
+	if rec := send(e, http.MethodDelete, url, nil, b); rec.Code != http.StatusNotFound || files.Len() != 1 {
+		t.Fatalf("other user DELETE = %d, objects = %d", rec.Code, files.Len())
+	}
+	if rec := send(e, http.MethodDelete, url, nil, a); rec.Code != http.StatusNoContent {
+		t.Fatalf("DELETE = %d", rec.Code)
+	}
+	if files.Len() != 0 || len(listAttachments(t, e, path, a)) != 0 {
+		t.Fatal("delete left data behind")
+	}
+	if rec := send(e, http.MethodDelete, url, nil, a); rec.Code != http.StatusNotFound {
+		t.Fatalf("second DELETE = %d", rec.Code)
+	}
+}
+
+func TestAttachmentDeleteBlockedWhenArchived(t *testing.T) {
+	e, files := newAttachmentServer(t)
+	a := signedUp(t, e)
+	path := blankProject(t, e, a)
+	var created attachmentJSON
+	decode(t, upload(e, path, "file", "briefing.pdf", attachmentSamples["briefing.pdf"], a), &created)
+	send(e, http.MethodPost, path+"/archive", nil, a)
+	if rec := send(e, http.MethodDelete, path+"/attachments/"+strconv.Itoa(created.ID), nil, a); rec.Code != http.StatusConflict || files.Len() != 1 {
+		t.Fatalf("archived DELETE = %d, objects = %d", rec.Code, files.Len())
+	}
+}
+
+func TestAttachmentDuplicateCopiesNone(t *testing.T) {
+	e, files := newAttachmentServer(t)
+	a := signedUp(t, e)
+	path := blankProject(t, e, a)
+	if rec := upload(e, path, "file", "briefing.pdf", attachmentSamples["briefing.pdf"], a); rec.Code != http.StatusCreated {
+		t.Fatalf("upload = %d", rec.Code)
+	}
+	var copied struct{ ID int }
+	decode(t, send(e, http.MethodPost, path+"/duplicate", nil, a), &copied)
+	if list := listAttachments(t, e, "/api/projects/"+strconv.Itoa(copied.ID), a); len(list) != 0 || files.Len() != 1 {
+		t.Fatalf("copy attachments = %+v, objects = %d", list, files.Len())
+	}
+}
