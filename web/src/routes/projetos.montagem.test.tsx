@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vite-plus/test";
 import { jsonResponse, mockFetch, renderAt } from "@/test-utils";
@@ -62,7 +62,12 @@ const builderRoutes = (
     if (path === "/api/projects/5" && !init?.method) return jsonResponse(200, project);
     if (path === "/api/projects/5/stages" && !init?.method) return jsonResponse(200, served());
     if (path === "/api/projects/5/payments" && !init?.method) return jsonResponse(200, plan);
-    return extra?.(path, init) ?? jsonResponse(500);
+    return (
+      extra?.(path, init) ??
+      (path === "/api/projects/5/attachments" && !init?.method
+        ? jsonResponse(200, [])
+        : jsonResponse(500))
+    );
   });
 
 test("builder lists stages with timing, task count, deliverable and internal label", async () => {
@@ -481,4 +486,124 @@ test("a malformed total blocks saving with a field error", async () => {
   await user.click(screen.getByRole("button", { name: "Salvar plano" }));
   expect(await screen.findByText("Informe um valor válido.")).toBeInTheDocument();
   expect(fetchSpy.mock.calls.some(([, init]) => init?.method === "PUT")).toBe(false);
+});
+
+type StoredAttachment = {
+  id: number;
+  name: string;
+  contentType: string;
+  size: number;
+  createdAt: string;
+};
+
+const stored = (id: number, name: string, contentType: string, size: number): StoredAttachment => ({
+  id,
+  name,
+  contentType,
+  size,
+  createdAt: "2026-10-18T10:00:00Z",
+});
+
+function attachmentRoutes(list: StoredAttachment[], archived = false) {
+  return mockFetch((path, init) => {
+    if (path === "/api/projects/5") return jsonResponse(200, { ...project, archived });
+    if (path === "/api/projects/5/stages") return jsonResponse(200, stages);
+    if (path === "/api/projects/5/payments") return jsonResponse(200, plan);
+    if (path === "/api/projects/5/attachments" && !init?.method) return jsonResponse(200, list);
+    if (path === "/api/projects/5/attachments" && init?.method === "POST") {
+      const sent = init.body instanceof FormData ? init.body.get("file") : null;
+      if (!(sent instanceof File)) return jsonResponse(400);
+      if (sent.name === "recusado.pdf")
+        return jsonResponse(400, { errors: { file: "Envie PDF, JPG, PNG ou ZIP." } });
+      list.push(stored(8, sent.name, sent.type, sent.size));
+      return jsonResponse(201, list.at(-1));
+    }
+    const target = path.match(/^\/api\/projects\/5\/attachments\/(\d+)$/);
+    if (target && init?.method === "DELETE") {
+      list.splice(
+        list.findIndex((item) => item.id === Number(target[1])),
+        1,
+      );
+      return jsonResponse(204);
+    }
+    return jsonResponse(500);
+  });
+}
+
+const briefing = stored(7, "briefing.pdf", "application/pdf", 248 * 1024);
+
+test("attachments card lists files with type, size and a download link", async () => {
+  attachmentRoutes([briefing, stored(9, "mood.png", "image/png", 3 * 1024 * 1024 + 300_000)]);
+  renderAt("/projetos/5/montagem");
+  const card = (await screen.findByRole("heading", { name: "05 / Anexos" })).closest("section")!;
+  const row = (await within(card).findByText("briefing.pdf")).closest(".file-row")!;
+  expect(row).toHaveTextContent("PDF · 248 KB");
+  expect(
+    within(row as HTMLElement).getByRole("link", { name: "Baixar briefing.pdf" }),
+  ).toHaveAttribute("href", "/api/projects/5/attachments/7");
+  expect(within(card).getByText("mood.png").closest(".file-row")).toHaveTextContent("PNG · 3,3 MB");
+});
+
+test("uploading a file posts it as multipart field file and lists it", async () => {
+  const fetchSpy = attachmentRoutes([]);
+  renderAt("/projetos/5/montagem");
+  const user = userEvent.setup();
+  await user.upload(
+    await screen.findByLabelText(/Escolher arquivos/),
+    new File(["%PDF-1.7"], "novo.pdf", { type: "application/pdf" }),
+  );
+  expect(await screen.findByText("novo.pdf")).toBeInTheDocument();
+  const post = fetchSpy.mock.calls.find(([, init]) => init?.method === "POST");
+  expect(post?.[0]).toBe("/api/projects/5/attachments");
+  expect(post?.[1]?.body).toBeInstanceOf(FormData);
+});
+
+test("client precheck rejects bad type and oversized files without calling the server", async () => {
+  const fetchSpy = attachmentRoutes([]);
+  renderAt("/projetos/5/montagem");
+  const user = userEvent.setup({ applyAccept: false });
+  const input = await screen.findByLabelText(/Escolher arquivos/);
+  await user.upload(input, new File(["x"], "notas.txt", { type: "text/plain" }));
+  expect(await screen.findByText("Envie PDF, JPG, PNG ou ZIP.")).toBeInTheDocument();
+  await user.upload(
+    input,
+    new File([new Uint8Array(20 * 1024 * 1024 + 1)], "grande.zip", { type: "application/zip" }),
+  );
+  expect(await screen.findByText("Cada arquivo pode ter até 20 MB.")).toBeInTheDocument();
+  expect(fetchSpy.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
+});
+
+test("server rejection of an upload is shown", async () => {
+  attachmentRoutes([]);
+  renderAt("/projetos/5/montagem");
+  await userEvent
+    .setup()
+    .upload(
+      await screen.findByLabelText(/Escolher arquivos/),
+      new File(["%PDF"], "recusado.pdf", { type: "application/pdf" }),
+    );
+  expect(await screen.findByText("Envie PDF, JPG, PNG ou ZIP.")).toBeInTheDocument();
+  expect(screen.queryByText("recusado.pdf")).not.toBeInTheDocument();
+});
+
+test("removing an attachment deletes it and refreshes the list", async () => {
+  const fetchSpy = attachmentRoutes([briefing]);
+  renderAt("/projetos/5/montagem");
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "Remover briefing.pdf" }));
+  await waitFor(() => expect(screen.queryByText("briefing.pdf")).not.toBeInTheDocument());
+  expect(
+    fetchSpy.mock.calls.some(
+      ([path, init]) => path === "/api/projects/5/attachments/7" && init?.method === "DELETE",
+    ),
+  ).toBe(true);
+});
+
+test("archived project shows attachments read-only", async () => {
+  attachmentRoutes([briefing], true);
+  renderAt("/projetos/5/montagem");
+  expect(await screen.findByText("briefing.pdf")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Baixar briefing.pdf" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Remover briefing.pdf" })).not.toBeInTheDocument();
+  expect(screen.queryByLabelText(/Escolher arquivos/)).not.toBeInTheDocument();
 });

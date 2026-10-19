@@ -246,11 +246,15 @@ export function Avatar({
 export function FileRow({
   name = "Contrato — Clara e Miguel.pdf",
   meta = "PDF · 248 KB",
+  href,
   onClick,
+  onRemove,
 }: {
   name?: string;
   meta?: string;
+  href?: string;
   onClick?: () => void;
+  onRemove?: () => void;
 }) {
   return (
     <div className="file-row">
@@ -261,9 +265,21 @@ export function FileRow({
         <strong>{name}</strong>
         <small>{meta}</small>
       </div>
+      {href && (
+        <Button asChild variant="ghost" size="icon">
+          <a href={href} aria-label={`Baixar ${name}`}>
+            <Download size={18} />
+          </a>
+        </Button>
+      )}
       {onClick && (
         <Button variant="ghost" size="icon" aria-label={`Abrir ${name}`} onClick={onClick}>
           <Download size={18} />
+        </Button>
+      )}
+      {onRemove && (
+        <Button variant="ghost" aria-label={`Remover ${name}`} onClick={onRemove}>
+          Remover
         </Button>
       )}
     </div>

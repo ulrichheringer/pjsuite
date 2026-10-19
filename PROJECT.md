@@ -59,7 +59,7 @@ Social login, plans/billing, marketplace, templates marketplace, automated email
 - [x] Projects: schema, CRUD + duplicate + archive, projects list, create/edit screens
 - [x] Builder structure: stages, tasks, deliverables, deadlines
 - [x] Builder commercial: price, payment plan
-- [ ] Builder attachments: R2 upload behind a storage interface (in-memory fake in tests), 20 MB limit, pdf/jpg/png/zip
+- [x] Builder attachments: R2 upload behind a storage interface (in-memory fake in tests), 20 MB limit, pdf/jpg/png/zip
 - [ ] Visibility + contract: block visibility, client preview, contract version 1, PDF view
 - [ ] Share + client review: link token, portal review, request change, refuse, invalid link
 - [ ] Revision + sign: new version flow, sign with receipt, immutability enforced
