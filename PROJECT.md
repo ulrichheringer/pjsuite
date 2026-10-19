@@ -63,7 +63,7 @@ Social login, plans/billing, marketplace, templates marketplace, automated email
 - [x] Visibility + contract: block visibility, client preview, contract version 1, PDF view
 - [x] Share + client review: link token, portal review, request change, refuse, invalid link
 - [x] Revision + sign: new version flow, sign with receipt, immutability enforced
-- [ ] Execution: tasks checklist, stage progress, file uploads to stages
+- [x] Execution: tasks checklist, stage progress, file uploads to stages
 - [ ] Delivery: publish delivery, client delivery view, token-checked downloads
 - [ ] Adjustment + approval: adjustment cycle, approve, conclude
 - [ ] History + notifications: events timeline (pro and client-shared), pro notifications list

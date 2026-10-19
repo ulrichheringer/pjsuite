@@ -20,11 +20,19 @@ const typeLabels: Record<string, string> = {
   "application/zip": "ZIP",
 };
 
-const precheck = (file: File) => {
+export const precheck = (file: File) => {
   const name = file.name.toLowerCase();
   if (!attachmentExtensions.some((extension) => name.endsWith(extension)))
     return attachmentTypeError;
   return file.size > maxAttachmentBytes ? attachmentSizeError : undefined;
+};
+
+export const fileMeta = (file: Attachment) => {
+  const size =
+    file.size < 1024 * 1024
+      ? `${Math.max(1, Math.round(file.size / 1024))} KB`
+      : `${(file.size / (1024 * 1024)).toFixed(1).replace(".", ",")} MB`;
+  return `${typeLabels[file.contentType] ?? file.contentType} · ${size}`;
 };
 
 export function Attachments({ projectId, readOnly }: { projectId: string; readOnly: boolean }) {
@@ -78,21 +86,15 @@ export function Attachments({ projectId, readOnly }: { projectId: string; readOn
       {loadFailed && <Banner title="Não foi possível carregar os anexos." tone="danger" />}
       {problem && <Banner title={problem} tone="danger" />}
       {!readOnly && <UploadBox onFiles={upload} />}
-      {files.map((file) => {
-        const size =
-          file.size < 1024 * 1024
-            ? `${Math.max(1, Math.round(file.size / 1024))} KB`
-            : `${(file.size / (1024 * 1024)).toFixed(1).replace(".", ",")} MB`;
-        return (
-          <FileRow
-            key={file.id}
-            name={file.name}
-            meta={`${typeLabels[file.contentType] ?? file.contentType} · ${size}`}
-            href={attachmentUrl(projectId, file.id)}
-            onRemove={readOnly ? undefined : () => remove(file)}
-          />
-        );
-      })}
+      {files.map((file) => (
+        <FileRow
+          key={file.id}
+          name={file.name}
+          meta={fileMeta(file)}
+          href={attachmentUrl(projectId, file.id)}
+          onRemove={readOnly ? undefined : () => remove(file)}
+        />
+      ))}
     </Section>
   );
 }

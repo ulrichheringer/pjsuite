@@ -15,7 +15,16 @@ function ReviewPage() {
             <ClientPreview view={portal.content} />
           </div>
           {portal.signature ? (
-            <ReceiptCard receipt={portal.signature} />
+            <>
+              <ReceiptCard receipt={portal.signature} />
+              <div className="form-actions">
+                <Button asChild>
+                  <Link to="/p/$token/acompanhar" params={{ token }}>
+                    Acompanhar projeto
+                  </Link>
+                </Button>
+              </div>
+            </>
           ) : portal.status === "refused" ? (
             <Banner title="Você recusou este projeto." />
           ) : (

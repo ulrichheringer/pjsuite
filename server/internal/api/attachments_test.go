@@ -37,6 +37,10 @@ func newAttachmentServer(t *testing.T) (*echo.Echo, *storage.Memory) {
 }
 
 func upload(e *echo.Echo, path, field, name string, data []byte, cookie *http.Cookie) *httptest.ResponseRecorder {
+	return uploadTo(e, path+"/attachments", field, name, data, cookie)
+}
+
+func uploadTo(e *echo.Echo, url, field, name string, data []byte, cookie *http.Cookie) *httptest.ResponseRecorder {
 	var body bytes.Buffer
 	w := multipart.NewWriter(&body)
 	part, err := w.CreateFormFile(field, name)
@@ -45,7 +49,7 @@ func upload(e *echo.Echo, path, field, name string, data []byte, cookie *http.Co
 	}
 	part.Write(data)
 	w.Close()
-	req := httptest.NewRequest(http.MethodPost, path+"/attachments", &body)
+	req := httptest.NewRequest(http.MethodPost, url, &body)
 	req.Header.Set("Content-Type", w.FormDataContentType())
 	if cookie != nil {
 		req.AddCookie(cookie)

@@ -16,11 +16,17 @@ const maxRequestRunes = 4000
 
 var errRequestClosed = errors.New("contract no longer accepts requests")
 
+type portalProgress struct {
+	Name   string `json:"name"`
+	Status string `json:"status"`
+}
+
 type portalView struct {
-	Version   int             `json:"version"`
-	Status    string          `json:"status"`
-	Content   json.RawMessage `json:"content"`
-	Signature *receipt        `json:"signature"`
+	Version   int               `json:"version"`
+	Status    string            `json:"status"`
+	Content   json.RawMessage   `json:"content"`
+	Signature *receipt          `json:"signature"`
+	Progress  *[]portalProgress `json:"progress,omitempty"`
 }
 
 func linkInvalid(c *echo.Context) error {
@@ -61,7 +67,30 @@ func (s *server) getPortal(c *echo.Context) error {
 		return err
 	}
 	view.Content = json.RawMessage(content)
+	if view.Status == "signed" {
+		if view.Progress, err = s.loadProgress(c.Request().Context(), projectID); err != nil {
+			return err
+		}
+	}
 	return c.JSON(http.StatusOK, view)
+}
+
+func (s *server) loadProgress(ctx context.Context, projectID int64) (*[]portalProgress, error) {
+	visible, err := s.loadVisibility(ctx, projectID)
+	if err != nil || !visible["stages"] {
+		return nil, err
+	}
+	list := []portalProgress{}
+	stages, err := s.loadStages(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+	for _, st := range stages {
+		if st.Visible {
+			list = append(list, portalProgress{Name: st.Name, Status: st.Status})
+		}
+	}
+	return &list, nil
 }
 
 func (s *server) postChange(c *echo.Context) error {

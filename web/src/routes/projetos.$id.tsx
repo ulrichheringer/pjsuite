@@ -87,6 +87,13 @@ function EditProjectPage() {
             </Link>
           </Button>
         </header>
+        {project.status === "signed" && (
+          <Button asChild>
+            <Link to="/projetos/$id/execucao" params={{ id }}>
+              Acompanhar execução
+            </Link>
+          </Button>
+        )}
         {failed && (
           <Banner title="Não foi possível concluir." tone="danger">
             Seus dados foram mantidos. Confira os campos e tente novamente.

@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vite-plus/test";
 import { jsonResponse, mockFetch, renderAt } from "@/test-utils";
@@ -17,11 +17,20 @@ const content = {
   },
 };
 
-const portal = (status = "viewed", signature: unknown = null) => ({
+const receipt = {
+  name: "Ana Lima",
+  email: "ana@example.com",
+  version: 1,
+  hash: "abc123",
+  signedAt: "2026-10-18T12:00:00Z",
+};
+
+const portal = (status = "viewed", signature: unknown = null, progress?: unknown) => ({
   version: 1,
   status,
   content,
   signature,
+  progress,
 });
 
 const portalRoutes = (
@@ -175,6 +184,58 @@ test("a signed project shows the receipt and no decision actions", async () => {
   expect(screen.getByText(/abc123/)).toBeVisible();
   expect(screen.queryByRole("link", { name: /Revisar e assinar/ })).toBeNull();
   expect(screen.queryByRole("link", { name: /Solicitar alteração/ })).toBeNull();
+});
+
+test("a signed review links to the progress screen and an open one does not", async () => {
+  portalRoutes("viewed");
+  renderAt("/p/TOK");
+  expect(await screen.findByRole("link", { name: /Revisar e assinar/ })).toBeVisible();
+  expect(screen.queryByRole("link", { name: /Acompanhar projeto/ })).toBeNull();
+  cleanup();
+
+  mockFetch(() => jsonResponse(200, portal("signed", receipt)));
+  renderAt("/p/TOK");
+  expect(await screen.findByRole("link", { name: /Acompanhar projeto/ })).toHaveAttribute(
+    "href",
+    "/p/TOK/acompanhar",
+  );
+});
+
+test("the progress screen lists the visible stages with their status", async () => {
+  mockFetch(() =>
+    jsonResponse(
+      200,
+      portal("signed", receipt, [
+        { name: "Descoberta", status: "done" },
+        { name: "Execução", status: "in_progress" },
+        { name: "Entrega final", status: "pending" },
+      ]),
+    ),
+  );
+  renderAt("/p/TOK/acompanhar");
+
+  expect(await screen.findByRole("heading", { name: "Acompanhar projeto" })).toBeVisible();
+  const items = screen.getAllByRole("listitem");
+  expect(items).toHaveLength(3);
+  expect(items[0]).toHaveTextContent("Descoberta");
+  expect(items[0]).toHaveTextContent("Concluído");
+  expect(items[1]).toHaveTextContent("Execução");
+  expect(items[1]).toHaveTextContent("Em execução");
+  expect(items[2]).toHaveTextContent("Pendente");
+});
+
+test("the progress screen shows the empty state without visible stages", async () => {
+  mockFetch(() => jsonResponse(200, portal("signed", receipt)));
+  renderAt("/p/TOK/acompanhar");
+
+  expect(await screen.findByText("Nenhuma etapa para acompanhar.")).toBeVisible();
+});
+
+test("the progress screen shows an error banner when loading fails", async () => {
+  mockFetch(() => jsonResponse(500));
+  renderAt("/p/TOK/acompanhar");
+
+  expect(await screen.findByText("Não foi possível abrir o projeto.")).toBeVisible();
 });
 
 test("the sign screen posts the signature and shows the receipt", async () => {
