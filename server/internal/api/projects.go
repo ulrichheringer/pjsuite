@@ -118,7 +118,7 @@ func (s *server) createProject(c *echo.Context) error {
 	if len(errs) > 0 {
 		return invalid(c, http.StatusBadRequest, errs)
 	}
-	return s.insertProject(c, p, seedStages(p.Structure))
+	return s.insertProject(c, p, seedStarter(p.Structure))
 }
 
 func (s *server) insertProject(c *echo.Context, p project, populate func(ctx context.Context, tx *sql.Tx, projectID int64) error) error {

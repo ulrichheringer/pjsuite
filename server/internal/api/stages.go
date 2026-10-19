@@ -338,7 +338,7 @@ var starterStages = []stageInput{
 	{Name: "Entrega final", TimingKind: "deadline", Timing: "Até 12 nov", Tasks: []string{"Publicar arquivos finais"}, Deliverable: "Entrega final aprovada", Visible: true},
 }
 
-func seedStages(structure string) func(ctx context.Context, tx *sql.Tx, projectID int64) error {
+func seedStarter(structure string) func(ctx context.Context, tx *sql.Tx, projectID int64) error {
 	if structure == "blank" {
 		return nil
 	}
@@ -348,6 +348,6 @@ func seedStages(structure string) func(ctx context.Context, tx *sql.Tx, projectI
 				return err
 			}
 		}
-		return nil
+		return insertPayments(ctx, tx, projectID, starterPayments)
 	}
 }
