@@ -17,7 +17,12 @@ const content = {
   },
 };
 
-const portal = (status = "viewed") => ({ version: 1, status, content });
+const portal = (status = "viewed", signature: unknown = null) => ({
+  version: 1,
+  status,
+  content,
+  signature,
+});
 
 const portalRoutes = (
   status: string,
@@ -138,4 +143,110 @@ test.each([
   await userEvent.click(await screen.findByRole("button", { name: button }));
 
   expect(await screen.findByText("Este projeto já foi recusado.")).toBeVisible();
+});
+
+test("the review offers to review and sign while the project is open", async () => {
+  portalRoutes("viewed");
+  renderAt("/p/TOK");
+
+  expect(await screen.findByRole("link", { name: /Revisar e assinar/ })).toHaveAttribute(
+    "href",
+    "/p/TOK/assinar",
+  );
+});
+
+test("a signed project shows the receipt and no decision actions", async () => {
+  mockFetch(() =>
+    jsonResponse(
+      200,
+      portal("signed", {
+        name: "Ana Lima",
+        email: "ana@example.com",
+        version: 1,
+        hash: "abc123",
+        signedAt: "2026-10-18T12:00:00Z",
+      }),
+    ),
+  );
+  renderAt("/p/TOK");
+
+  expect(await screen.findByText("Recibo demonstrativo")).toBeVisible();
+  expect(screen.getByText(/Assinado por Ana Lima/)).toBeVisible();
+  expect(screen.getByText(/abc123/)).toBeVisible();
+  expect(screen.queryByRole("link", { name: /Revisar e assinar/ })).toBeNull();
+  expect(screen.queryByRole("link", { name: /Solicitar alteração/ })).toBeNull();
+});
+
+test("the sign screen posts the signature and shows the receipt", async () => {
+  const receipt = {
+    name: "Ana Lima",
+    email: "ana@example.com",
+    version: 1,
+    hash: "abc123",
+    signedAt: "2026-10-18T12:00:00Z",
+  };
+  const spy = portalRoutes("viewed", (path, init) => {
+    if (path === "/api/portal/TOK/sign" && init?.method === "POST") return jsonResponse(200, receipt);
+  });
+  renderAt("/p/TOK/assinar");
+
+  await userEvent.type(await screen.findByLabelText(/Nome completo/), "Ana Lima");
+  await userEvent.type(screen.getByLabelText(/E-mail/), "ana@example.com");
+  await userEvent.click(screen.getByRole("checkbox"));
+  await userEvent.click(screen.getByRole("button", { name: /Assinar/ }));
+
+  expect(await screen.findByText("Recibo demonstrativo")).toBeVisible();
+  const call = spy.mock.calls.find(([path]) => path === "/api/portal/TOK/sign")!;
+  expect(JSON.parse(String(call[1]?.body))).toEqual({
+    version: 1,
+    name: "Ana Lima",
+    email: "ana@example.com",
+    consent: true,
+  });
+});
+
+test("the sign screen shows the server validation errors", async () => {
+  portalRoutes("viewed", (path, init) => {
+    if (path === "/api/portal/TOK/sign" && init?.method === "POST")
+      return jsonResponse(400, {
+        errors: { email: "Confira o e-mail.", consent: "Confirme o aceite para assinar." },
+      });
+  });
+  renderAt("/p/TOK/assinar");
+
+  await userEvent.type(await screen.findByLabelText(/Nome completo/), "Ana Lima");
+  await userEvent.type(screen.getByLabelText(/E-mail/), "ana@");
+  await userEvent.click(screen.getByRole("button", { name: /Assinar/ }));
+
+  expect(await screen.findByText("Confira o e-mail.")).toBeVisible();
+  expect(screen.getByText("Confirme o aceite para assinar.")).toBeVisible();
+});
+
+test("the sign screen explains a stale version and a closed contract", async () => {
+  let reply = jsonResponse(409, { error: "stale_version" });
+  portalRoutes("viewed", (path, init) => {
+    if (path === "/api/portal/TOK/sign" && init?.method === "POST") return reply;
+  });
+  renderAt("/p/TOK/assinar");
+
+  await userEvent.type(await screen.findByLabelText(/Nome completo/), "Ana Lima");
+  await userEvent.type(screen.getByLabelText(/E-mail/), "ana@example.com");
+  await userEvent.click(screen.getByRole("checkbox"));
+  await userEvent.click(screen.getByRole("button", { name: /Assinar/ }));
+  expect(await screen.findByText("Uma nova versão foi publicada.")).toBeVisible();
+
+  reply = jsonResponse(409, { errors: { status: "O contrato já foi recusado ou assinado." } });
+  await userEvent.click(screen.getByRole("button", { name: /Assinar/ }));
+  expect(await screen.findByText("Este contrato não pode mais ser assinado.")).toBeVisible();
+});
+
+test("the sign screen shows a banner when the server fails", async () => {
+  portalRoutes("viewed");
+  renderAt("/p/TOK/assinar");
+
+  await userEvent.type(await screen.findByLabelText(/Nome completo/), "Ana Lima");
+  await userEvent.type(screen.getByLabelText(/E-mail/), "ana@example.com");
+  await userEvent.click(screen.getByRole("button", { name: /Assinar/ }));
+
+  expect(await screen.findByText("Não foi possível assinar.")).toBeVisible();
 });

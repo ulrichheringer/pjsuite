@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { getPortal, type Portal } from "@/api";
+import { getPortal, type Portal, type Receipt } from "@/api";
 import { Banner, Blank, Loading } from "@/ui";
 
 type PortalState =
@@ -44,5 +44,21 @@ export function PortalPage({
         {state.kind === "ok" && children(state.portal)}
       </main>
     </div>
+  );
+}
+
+export function ReceiptCard({ receipt }: { receipt: Receipt }) {
+  return (
+    <section className="surface">
+      <h2>Recibo demonstrativo</h2>
+      <p>
+        Assinado por {receipt.name} · {receipt.email}
+      </p>
+      <p>
+        Versão {receipt.version} · {new Date(receipt.signedAt).toLocaleString("pt-BR")}
+      </p>
+      <p className="small">Código da versão: {receipt.hash}</p>
+      <p className="small">Recibo demonstrativo, sem validade de assinatura certificada.</p>
+    </section>
   );
 }
