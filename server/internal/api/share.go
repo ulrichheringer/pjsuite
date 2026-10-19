@@ -55,7 +55,20 @@ func (s *server) loadShare(ctx context.Context, projectID int64) (shareLink, err
 	return l, err
 }
 
+const (
+	keepShare    = `DO NOTHING`
+	replaceShare = `DO UPDATE SET token = excluded.token, created_at = excluded.created_at, viewed_at = NULL`
+)
+
 func (s *server) createShare(c *echo.Context, p project) error {
+	return s.writeShare(c, p, keepShare)
+}
+
+func (s *server) regenerateShare(c *echo.Context, p project) error {
+	return s.writeShare(c, p, replaceShare)
+}
+
+func (s *server) writeShare(c *echo.Context, p project, onConflict string) error {
 	token, err := newToken()
 	if err != nil {
 		return err
@@ -68,7 +81,7 @@ func (s *server) createShare(c *echo.Context, p project) error {
 		if !hasContract {
 			return errNoContract
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO share_links (project_id, token) VALUES (?, ?) ON CONFLICT (project_id) DO NOTHING`, p.ID, token); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO share_links (project_id, token) VALUES (?, ?) ON CONFLICT (project_id) `+onConflict, p.ID, token); err != nil {
 			return err
 		}
 		_, err := tx.ExecContext(ctx, `UPDATE projects SET status = 'sent' WHERE id = ? AND status = 'final'`, p.ID)
