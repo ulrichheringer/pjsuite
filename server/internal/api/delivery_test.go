@@ -146,13 +146,20 @@ func publishDraft(e *echo.Echo, path string, title, message string, a *http.Cook
 	return send(e, http.MethodPost, path+"/deliveries/draft/publish", map[string]string{"title": title, "message": message}, a)
 }
 
+func mustUpload(t *testing.T, e *echo.Echo, url, name string, data []byte, a *http.Cookie) {
+	t.Helper()
+	if rec := uploadTo(e, url, "file", name, data, a); rec.Code != http.StatusCreated {
+		t.Fatalf("upload %s = %d %s", name, rec.Code, rec.Body)
+	}
+}
+
 func TestDeliveryPublishAssignsNumbersAndClearsDraft(t *testing.T) {
 	e, _ := newAttachmentServer(t)
 	a := signedUp(t, e)
 	path, _ := signedProject(t, e, a)
 	url := path + "/deliveries/draft/files"
 
-	uploadTo(e, url, "file", "briefing.pdf", attachmentSamples["briefing.pdf"], a)
+	mustUpload(t, e, url, "briefing.pdf", attachmentSamples["briefing.pdf"], a)
 	if rec := publishDraft(e, path, "  Entrega final ", "Segue o material.", a); rec.Code != http.StatusNoContent {
 		t.Fatalf("publish = %d %s", rec.Code, rec.Body)
 	}
@@ -166,7 +173,7 @@ func TestDeliveryPublishAssignsNumbersAndClearsDraft(t *testing.T) {
 		t.Fatalf("first = %+v", first)
 	}
 
-	uploadTo(e, url, "file", "logo.png", attachmentSamples["logo.png"], a)
+	mustUpload(t, e, url, "logo.png", attachmentSamples["logo.png"], a)
 	if rec := publishDraft(e, path, "Ajustes", "", a); rec.Code != http.StatusNoContent {
 		t.Fatalf("second publish = %d %s", rec.Code, rec.Body)
 	}
@@ -185,7 +192,7 @@ func TestDeliveryPublishRejectsInvalidDrafts(t *testing.T) {
 	if rec := publishDraft(e, path, "Entrega", "", a); rec.Code != http.StatusBadRequest {
 		t.Errorf("no draft = %d", rec.Code)
 	}
-	uploadTo(e, path+"/deliveries/draft/files", "file", "briefing.pdf", attachmentSamples["briefing.pdf"], a)
+	mustUpload(t, e, path+"/deliveries/draft/files", "briefing.pdf", attachmentSamples["briefing.pdf"], a)
 	for name, in := range map[string][2]string{
 		"blank title": {"  ", ""},
 		"long title":  {strings.Repeat("a", 121), ""},
@@ -221,9 +228,11 @@ func TestDeliveryPortalListsPublishedOnly(t *testing.T) {
 	if view.Deliveries == nil || len(view.Deliveries) != 0 {
 		t.Fatalf("before any = %v", view.Deliveries)
 	}
-	uploadTo(e, url, "file", "briefing.pdf", attachmentSamples["briefing.pdf"], a)
-	publishDraft(e, path, "Entrega final", "Segue.", a)
-	uploadTo(e, url, "file", "secret.png", attachmentSamples["logo.png"], a)
+	mustUpload(t, e, url, "briefing.pdf", attachmentSamples["briefing.pdf"], a)
+	if rec := publishDraft(e, path, "Entrega final", "Segue.", a); rec.Code != http.StatusNoContent {
+		t.Fatalf("publish = %d %s", rec.Code, rec.Body)
+	}
+	mustUpload(t, e, url, "secret.png", attachmentSamples["logo.png"], a)
 
 	rec := get(e, portal)
 	decode(t, rec, &view)
@@ -243,7 +252,7 @@ func TestDeliveryPortalListsPublishedOnly(t *testing.T) {
 
 func publishedFile(t *testing.T, e *echo.Echo, path, name string, data []byte, a *http.Cookie) attachmentJSON {
 	t.Helper()
-	uploadTo(e, path+"/deliveries/draft/files", "file", name, data, a)
+	mustUpload(t, e, path+"/deliveries/draft/files", name, data, a)
 	if rec := publishDraft(e, path, "Entrega", "", a); rec.Code != http.StatusNoContent {
 		t.Fatalf("publish = %d %s", rec.Code, rec.Body)
 	}
