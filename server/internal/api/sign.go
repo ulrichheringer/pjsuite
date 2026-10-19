@@ -106,3 +106,20 @@ func (s *server) postSign(c *echo.Context) error {
 	}
 	return c.JSON(http.StatusOK, r)
 }
+
+type rowQuerier interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+func loadReceipt(ctx context.Context, q rowQuerier, projectID int64) (*receipt, error) {
+	var r receipt
+	err := q.QueryRowContext(ctx, `SELECT name, email, version, hash, signed_at FROM signatures WHERE project_id = ?`, projectID).
+		Scan(&r.Name, &r.Email, &r.Version, &r.Hash, &r.SignedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &r, nil
+}

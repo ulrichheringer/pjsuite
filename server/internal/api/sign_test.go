@@ -339,6 +339,11 @@ func TestSignDuplicateDropsContractLinkAndSignature(t *testing.T) {
 	}
 }
 
+type receiptJSON struct {
+	Name    string `json:"name"`
+	Version int    `json:"version"`
+}
+
 func TestSignContractListShowsVersionsAndSignature(t *testing.T) {
 	e := newServer(t)
 	a := signedUp(t, e)
@@ -346,7 +351,7 @@ func TestSignContractListShowsVersionsAndSignature(t *testing.T) {
 
 	var empty struct {
 		Versions  []map[string]any `json:"versions"`
-		Signature *receipt         `json:"signature"`
+		Signature *receiptJSON     `json:"signature"`
 	}
 	rec := get(e, path+"/contract", a)
 	decode(t, rec, &empty)
@@ -368,7 +373,7 @@ func TestSignContractListShowsVersionsAndSignature(t *testing.T) {
 			Note      string `json:"note"`
 			CreatedAt string `json:"createdAt"`
 		} `json:"versions"`
-		Signature *receipt `json:"signature"`
+		Signature *receiptJSON `json:"signature"`
 	}
 	decode(t, rec, &list)
 	if len(list.Versions) != 2 || list.Versions[0].Number != 2 || list.Versions[0].Note != "Ajuste" || list.Versions[1].Number != 1 || len(list.Versions[1].Hash) != 64 || list.Versions[1].CreatedAt == "" {

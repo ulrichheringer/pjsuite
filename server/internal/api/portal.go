@@ -51,15 +51,7 @@ func (s *server) getPortal(c *echo.Context) error {
 		if err != nil {
 			return err
 		}
-		var r receipt
-		err = tx.QueryRowContext(ctx, `SELECT name, email, version, hash, signed_at FROM signatures WHERE project_id = ?`, projectID).
-			Scan(&r.Name, &r.Email, &r.Version, &r.Hash, &r.SignedAt)
-		if err == nil {
-			view.Signature = &r
-		}
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil
-		}
+		view.Signature, err = loadReceipt(ctx, tx, projectID)
 		return err
 	})
 	if errors.Is(err, sql.ErrNoRows) {

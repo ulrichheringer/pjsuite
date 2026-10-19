@@ -125,7 +125,7 @@ func (s *server) getContract(c *echo.Context) error {
 	var content string
 	v := contractVersion{Number: number}
 	err = s.db.QueryRowContext(c.Request().Context(),
-		`SELECT hash, created_at, content FROM contract_versions WHERE project_id = ? AND number = ?`, p.ID, number).Scan(&v.Hash, &v.CreatedAt, &content)
+		`SELECT hash, note, created_at, content FROM contract_versions WHERE project_id = ? AND number = ?`, p.ID, number).Scan(&v.Hash, &v.Note, &v.CreatedAt, &content)
 	if errors.Is(err, sql.ErrNoRows) {
 		return echo.ErrNotFound
 	}
@@ -134,4 +134,43 @@ func (s *server) getContract(c *echo.Context) error {
 	}
 	v.Content = json.RawMessage(content)
 	return c.JSON(http.StatusOK, v)
+}
+
+type versionSummary struct {
+	Number    int    `json:"number"`
+	Hash      string `json:"hash"`
+	Note      string `json:"note"`
+	CreatedAt string `json:"createdAt"`
+}
+
+func (s *server) listContract(c *echo.Context) error {
+	p, err := s.findProject(c)
+	if err != nil {
+		return err
+	}
+	ctx := c.Request().Context()
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT number, hash, note, created_at FROM contract_versions WHERE project_id = ? ORDER BY number DESC`, p.ID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	list := struct {
+		Versions  []versionSummary `json:"versions"`
+		Signature *receipt         `json:"signature"`
+	}{Versions: []versionSummary{}}
+	for rows.Next() {
+		var v versionSummary
+		if err := rows.Scan(&v.Number, &v.Hash, &v.Note, &v.CreatedAt); err != nil {
+			return err
+		}
+		list.Versions = append(list.Versions, v)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if list.Signature, err = loadReceipt(ctx, s.db, p.ID); err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, list)
 }
