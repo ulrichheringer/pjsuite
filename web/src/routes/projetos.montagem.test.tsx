@@ -46,6 +46,14 @@ const stages = [
   }),
 ];
 
+const plan = {
+  priceCents: 150000,
+  payments: [
+    { kind: "entrada", percent: 30, trigger: "assinatura", due: "Na assinatura do contrato" },
+    { kind: "saldo", percent: 50, trigger: "antes_entrega", due: "" },
+  ],
+};
+
 const builderRoutes = (
   extra?: (path: string, init?: RequestInit) => Response | undefined,
   served: () => unknown = () => stages,
@@ -53,6 +61,7 @@ const builderRoutes = (
   mockFetch((path, init) => {
     if (path === "/api/projects/5" && !init?.method) return jsonResponse(200, project);
     if (path === "/api/projects/5/stages" && !init?.method) return jsonResponse(200, served());
+    if (path === "/api/projects/5/payments" && !init?.method) return jsonResponse(200, plan);
     return extra?.(path, init) ?? jsonResponse(500);
   });
 
@@ -333,4 +342,143 @@ test("an archived project cannot change its stages", async () => {
   expect(screen.queryByRole("button", { name: /Adicionar nova etapa/ })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Editar Descoberta" })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: /Mover/ })).not.toBeInTheDocument();
+});
+
+test("payment plan shows the total, computed values and the distributed balance", async () => {
+  builderRoutes();
+  renderAt("/projetos/5/montagem");
+  const user = userEvent.setup();
+  const cards = await screen.findAllByRole("article");
+  expect(cards).toHaveLength(2);
+  expect(screen.getByLabelText("Valor total do projeto (R$)")).toHaveValue("1500");
+  expect(cards[0]!.textContent).toMatch(/R\$\s450,00/);
+  expect(cards[1]!.textContent).toMatch(/R\$\s750,00/);
+  expect(screen.getByText("80% distribuído")).toBeInTheDocument();
+  expect(screen.getByText("Faltam 20% para fechar o valor")).toBeInTheDocument();
+
+  const slider = within(cards[0]!).getByRole("slider");
+  slider.focus();
+  await user.keyboard("{ArrowRight}");
+  expect(cards[0]).toHaveTextContent("35%");
+  expect(cards[0]!.textContent).toMatch(/R\$\s525,00/);
+  expect(screen.getByText("85% distribuído")).toBeInTheDocument();
+
+  await user.clear(screen.getByLabelText("Valor total do projeto (R$)"));
+  await user.type(screen.getByLabelText("Valor total do projeto (R$)"), "2000");
+  expect(cards[0]!.textContent).toMatch(/R\$\s700,00/);
+
+  await user.click(screen.getByRole("button", { name: "Adicionar pagamento" }));
+  expect(screen.getAllByRole("article")).toHaveLength(3);
+  await user.click(screen.getByRole("button", { name: "Remover Parcela intermediária" }));
+  expect(screen.getAllByRole("article")).toHaveLength(2);
+});
+
+test("a preset replaces the plan and Salvar puts it", async () => {
+  const fetchSpy = builderRoutes((path, init) =>
+    path === "/api/projects/5/payments" && init?.method === "PUT" ? jsonResponse(204) : undefined,
+  );
+  renderAt("/projetos/5/montagem");
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "3 parcelas" }));
+  expect(screen.getAllByRole("article")).toHaveLength(3);
+  expect(screen.getByText("100% distribuído")).toBeInTheDocument();
+  expect(screen.getByText("Plano fechado")).toBeInTheDocument();
+  expect(fetchSpy.mock.calls.some(([, init]) => init?.method === "PUT")).toBe(false);
+
+  await user.click(screen.getByRole("button", { name: "Salvar plano" }));
+  expect(await screen.findByText("Plano de pagamento salvo.")).toBeInTheDocument();
+  const [body] = sentBodies(fetchSpy.mock.calls, "PUT", "/api/projects/5/payments");
+  expect(body.priceCents).toBe(150000);
+  expect(body.payments.map((p: { kind: string; percent: number }) => [p.kind, p.percent])).toEqual([
+    ["entrada", 35],
+    ["parcela", 35],
+    ["saldo", 30],
+  ]);
+
+  await user.click(screen.getByRole("button", { name: "À vista" }));
+  expect(screen.getAllByRole("article")).toHaveLength(1);
+  await user.click(screen.getByRole("button", { name: "30% + saldo" }));
+  expect(screen.getAllByRole("article")).toHaveLength(2);
+  expect(screen.getByText("100% distribuído")).toBeInTheDocument();
+});
+
+test("rejected payment plan shows the server errors and keeps the edits", async () => {
+  builderRoutes((path, init) =>
+    path === "/api/projects/5/payments" && init?.method === "PUT"
+      ? jsonResponse(400, {
+          errors: {
+            priceCents: "Informe um valor entre R$ 0 e R$ 10.000.000.",
+            payments: "A soma dos percentuais passa de 100%.",
+          },
+        })
+      : undefined,
+  );
+  renderAt("/projetos/5/montagem");
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "Salvar plano" }));
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Não foi possível salvar o plano de pagamento.",
+  );
+  expect(screen.getByText("A soma dos percentuais passa de 100%.")).toBeInTheDocument();
+  expect(screen.getByText("Informe um valor entre R$ 0 e R$ 10.000.000.")).toBeInTheDocument();
+  expect(screen.getAllByRole("article")).toHaveLength(2);
+});
+
+test("payment plan reports the excess when over 100%", async () => {
+  builderRoutes();
+  renderAt("/projetos/5/montagem");
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "3 parcelas" }));
+  within(screen.getAllByRole("article")[0]!).getByRole("slider").focus();
+  await user.keyboard("{ArrowRight}");
+  expect(screen.getByText("105% distribuído")).toBeInTheDocument();
+  expect(screen.getByText("5% acima do valor")).toBeInTheDocument();
+  expect(screen.queryByText(/Faltam/)).not.toBeInTheDocument();
+});
+
+test("editing rows clears the saved banner and any row can be removed", async () => {
+  builderRoutes((path, init) =>
+    path === "/api/projects/5/payments" && init?.method === "PUT" ? jsonResponse(204) : undefined,
+  );
+  renderAt("/projetos/5/montagem");
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "À vista" }));
+  await user.click(screen.getByRole("button", { name: "Salvar plano" }));
+  expect(await screen.findByText("Plano de pagamento salvo.")).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Adicionar pagamento" }));
+  expect(screen.queryByText("Plano de pagamento salvo.")).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Salvar plano" }));
+  expect(await screen.findByText("Plano de pagamento salvo.")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Remover Pagamento único" }));
+  expect(screen.queryByText("Plano de pagamento salvo.")).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Remover Parcela intermediária" }));
+  expect(screen.queryAllByRole("article")).toHaveLength(0);
+});
+
+test("Adicionar pagamento is disabled at 12 rows", async () => {
+  builderRoutes();
+  renderAt("/projetos/5/montagem");
+  const user = userEvent.setup();
+  await screen.findAllByRole("article");
+  const add = screen.getByRole("button", { name: "Adicionar pagamento" });
+  for (let i = 0; i < 10; i++) await user.click(add);
+  expect(screen.getAllByRole("article")).toHaveLength(12);
+  expect(add).toBeDisabled();
+});
+
+test("a malformed total blocks saving with a field error", async () => {
+  const fetchSpy = builderRoutes((path, init) =>
+    path === "/api/projects/5/payments" && init?.method === "PUT" ? jsonResponse(204) : undefined,
+  );
+  renderAt("/projetos/5/montagem");
+  const user = userEvent.setup();
+  const price = await screen.findByLabelText("Valor total do projeto (R$)");
+  await user.clear(price);
+  await user.type(price, "1,2,3");
+  await user.click(screen.getByRole("button", { name: "Salvar plano" }));
+  expect(await screen.findByText("Informe um valor válido.")).toBeInTheDocument();
+  expect(fetchSpy.mock.calls.some(([, init]) => init?.method === "PUT")).toBe(false);
 });

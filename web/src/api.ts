@@ -210,3 +210,42 @@ export const deleteStage = (projectId: string, stageId: number) =>
 
 export const reorderStages = (projectId: string, ids: number[]) =>
   call(`${stagePath(projectId)}/order`, json("PUT", { ids }), none);
+
+export const paymentKindLabels = {
+  entrada: "Entrada",
+  parcela: "Parcela intermediária",
+  saldo: "Saldo final",
+  unico: "Pagamento único",
+} as const;
+
+export const paymentTriggerLabels = {
+  assinatura: "Na assinatura",
+  data: "Data específica",
+  etapa: "Início de etapa",
+  antes_entrega: "Antes da entrega",
+  apos_aprovacao: "Após aprovação",
+} as const;
+
+const paymentPlanSchema = z.object({
+  priceCents: z.number(),
+  payments: z.array(
+    z.object({
+      kind: z.enum(["entrada", "parcela", "saldo", "unico"]),
+      percent: z.number(),
+      trigger: z.enum(["assinatura", "data", "etapa", "antes_entrega", "apos_aprovacao"]),
+      due: z.string(),
+    }),
+  ),
+});
+
+export type PaymentPlan = z.infer<typeof paymentPlanSchema>;
+export type Payment = PaymentPlan["payments"][number];
+
+const paymentsPath = (projectId: string) =>
+  `/api/projects/${encodeURIComponent(projectId)}/payments`;
+
+export const getPayments = (projectId: string) =>
+  call(paymentsPath(projectId), {}, async (res) => paymentPlanSchema.parse(await res.json()));
+
+export const savePayments = (projectId: string, plan: PaymentPlan) =>
+  call(paymentsPath(projectId), json("PUT", plan), none);
