@@ -35,8 +35,13 @@ func run() error {
 		return err
 	}
 
+	files, err := storage.FromEnv(os.Getenv)
+	if err != nil {
+		return err
+	}
+
 	sc := echo.StartConfig{Address: env("PJSUITE_ADDR", ":8080")}
-	return sc.Start(ctx, api.New(db, storage.NewMemory()))
+	return sc.Start(ctx, api.New(db, files))
 }
 
 func env(key, def string) string {

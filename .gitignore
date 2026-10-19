@@ -6,6 +6,7 @@ dist/
 *.db-shm
 *.db-wal
 /server/bin/
+/server/files/
 .env
 .env.*
 !.env.example
