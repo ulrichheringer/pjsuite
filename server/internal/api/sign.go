@@ -64,14 +64,21 @@ func (s *server) postSign(c *echo.Context) error {
 	var r receipt
 	err := s.inTx(c, func(ctx context.Context, tx *sql.Tx) error {
 		var projectID int64
-		var status string
 		err := tx.QueryRowContext(ctx,
-			`SELECT p.id, p.status FROM share_links l JOIN projects p ON p.id = l.project_id WHERE l.token = ? AND p.archived_at IS NULL`,
-			c.Param("token")).Scan(&projectID, &status)
+			`SELECT p.id FROM share_links l JOIN projects p ON p.id = l.project_id WHERE l.token = ? AND p.archived_at IS NULL`,
+			c.Param("token")).Scan(&projectID)
 		if err != nil {
 			return err
 		}
-		if status == "refused" || status == "signed" {
+		res, err := tx.ExecContext(ctx, `UPDATE projects SET status = 'signed' WHERE id = ? AND status NOT IN ('refused', 'signed')`, projectID)
+		if err != nil {
+			return err
+		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if n == 0 {
 			return errSignClosed
 		}
 		var latest int
@@ -86,10 +93,6 @@ func (s *server) postSign(c *echo.Context) error {
 			SELECT project_id, number, ?, ?, ?, ?, hash FROM contract_versions WHERE project_id = ? AND number = ?
 			RETURNING name, email, version, hash, signed_at`,
 			in.Name, in.Email, c.RealIP(), c.Request().UserAgent(), projectID, latest).Scan(&r.Name, &r.Email, &r.Version, &r.Hash, &r.SignedAt)
-		if err != nil {
-			return err
-		}
-		_, err = tx.ExecContext(ctx, `UPDATE projects SET status = 'signed' WHERE id = ?`, projectID)
 		return err
 	})
 	if errors.Is(err, sql.ErrNoRows) {
