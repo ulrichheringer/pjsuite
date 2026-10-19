@@ -199,6 +199,9 @@ func (s *server) writableProject(handle func(c *echo.Context, p project) error) 
 		if p.Archived {
 			return invalid(c, http.StatusConflict, fieldErrors{"archived": "Projeto arquivado."})
 		}
+		if p.Status == "signed" {
+			return invalid(c, http.StatusConflict, fieldErrors{"signed": "Contrato assinado não pode ser alterado."})
+		}
 		return handle(c, p)
 	}
 }

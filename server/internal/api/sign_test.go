@@ -5,6 +5,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/labstack/echo/v5"
 )
 
 func TestSignDBRejectsChangesToVersionsAndSignatures(t *testing.T) {
@@ -232,5 +234,155 @@ func TestSignRejectsRefusedContract(t *testing.T) {
 	}
 	if rec := send(e, http.MethodPost, "/api/portal/"+l.Token+"/sign", signBody(1), nil); rec.Code != http.StatusConflict {
 		t.Errorf("sign refused = %d", rec.Code)
+	}
+}
+
+func signedProject(t *testing.T, e *echo.Echo, a *http.Cookie) (string, shareJSON) {
+	t.Helper()
+	path, l := finalizedShare(t, e, a)
+	if rec := send(e, http.MethodPost, "/api/portal/"+l.Token+"/sign", signBody(1), nil); rec.Code != http.StatusOK {
+		t.Fatalf("sign = %d %s", rec.Code, rec.Body)
+	}
+	return path, l
+}
+
+func TestSignFreezesEveryBuilderWrite(t *testing.T) {
+	e := newServer(t)
+	a := signedUp(t, e)
+	path, l := signedProject(t, e, a)
+	portal := "/api/portal/" + l.Token
+
+	writes := []struct {
+		method, suffix string
+		body           any
+	}{
+		{http.MethodPut, "", map[string]any{"name": "Novo", "clientId": 1}},
+		{http.MethodPut, "/builder", map[string]any{"scope": "Novo"}},
+		{http.MethodPut, "/visibility", map[string]bool{"scope": false}},
+		{http.MethodPut, "/payments", map[string]any{"priceCents": 1, "payments": []map[string]any{}}},
+		{http.MethodPost, "/stages", map[string]any{"name": "Nova", "timingKind": "none"}},
+		{http.MethodPut, "/stages/order", map[string]any{"ids": []int{1}}},
+		{http.MethodPut, "/stages/1", map[string]any{"name": "Nova", "timingKind": "none"}},
+		{http.MethodDelete, "/stages/1", nil},
+		{http.MethodDelete, "/attachments/1", nil},
+		{http.MethodPost, "/contract", nil},
+		{http.MethodPost, "/contract/revision", map[string]string{"note": "x"}},
+		{http.MethodPost, "/share", nil},
+		{http.MethodPost, "/share/regenerate", nil},
+	}
+	for _, w := range writes {
+		if rec := send(e, w.method, path+w.suffix, w.body, a); rec.Code != http.StatusConflict {
+			t.Errorf("%s %s = %d", w.method, w.suffix, rec.Code)
+		}
+	}
+	if rec := upload(e, path, "file", "outro.pdf", attachmentSamples["briefing.pdf"], a); rec.Code != http.StatusConflict {
+		t.Errorf("upload = %d", rec.Code)
+	}
+	var frozen struct {
+		Errors map[string]string `json:"errors"`
+	}
+	decode(t, send(e, http.MethodPut, path+"/builder", map[string]any{"scope": "Novo"}, a), &frozen)
+	if frozen.Errors["signed"] != "Contrato assinado não pode ser alterado." {
+		t.Errorf("errors = %v", frozen.Errors)
+	}
+	if rec := send(e, http.MethodPost, portal+"/change", map[string]string{"message": "Mudar"}, nil); rec.Code != http.StatusConflict {
+		t.Errorf("change = %d", rec.Code)
+	}
+	if rec := send(e, http.MethodPost, portal+"/refuse", map[string]string{"reason": ""}, nil); rec.Code != http.StatusConflict {
+		t.Errorf("refuse = %d", rec.Code)
+	}
+	var p map[string]any
+	decode(t, get(e, path, a), &p)
+	if p["status"] != "signed" {
+		t.Fatalf("status = %v", p["status"])
+	}
+}
+
+func TestSignPortalHidesIPAndUserAgent(t *testing.T) {
+	e := newServer(t)
+	a := signedUp(t, e)
+	_, l := finalizedShare(t, e, a)
+	req := httptest.NewRequest(http.MethodPost, "/api/portal/"+l.Token+"/sign", strings.NewReader(`{"version":1,"name":"Ana","email":"ana@example.com","consent":true}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", "SECRET-AGENT/9")
+	req.RemoteAddr = "198.51.100.7:1234"
+	signed := httptest.NewRecorder()
+	e.ServeHTTP(signed, req)
+	if signed.Code != http.StatusOK {
+		t.Fatalf("sign = %d", signed.Code)
+	}
+	for _, body := range []string{signed.Body.String(), get(e, "/api/portal/"+l.Token).Body.String()} {
+		for _, secret := range []string{"SECRET-AGENT", "198.51.100.7"} {
+			if strings.Contains(body, secret) {
+				t.Errorf("leaked %q in %s", secret, body)
+			}
+		}
+	}
+}
+
+func TestSignDuplicateDropsContractLinkAndSignature(t *testing.T) {
+	e, db := newServerDB(t)
+	a := signedUp(t, e)
+	path, _ := signedProject(t, e, a)
+	var copied map[string]any
+	rec := send(e, http.MethodPost, path+"/duplicate", nil, a)
+	decode(t, rec, &copied)
+	if rec.Code != http.StatusCreated || copied["status"] != "draft" {
+		t.Fatalf("copy = %d %v", rec.Code, copied)
+	}
+	var versions, signatures, links int
+	err := db.QueryRowContext(t.Context(),
+		`SELECT (SELECT COUNT(*) FROM contract_versions WHERE project_id = ?), (SELECT COUNT(*) FROM signatures WHERE project_id = ?), (SELECT COUNT(*) FROM share_links WHERE project_id = ?)`,
+		copied["id"], copied["id"], copied["id"]).Scan(&versions, &signatures, &links)
+	if err != nil || versions+signatures+links != 0 {
+		t.Fatalf("copy has %d versions %d signatures %d links (%v)", versions, signatures, links, err)
+	}
+}
+
+func TestSignContractListShowsVersionsAndSignature(t *testing.T) {
+	e := newServer(t)
+	a := signedUp(t, e)
+	path, l := finalizedShare(t, e, a)
+
+	var empty struct {
+		Versions  []map[string]any `json:"versions"`
+		Signature *receipt         `json:"signature"`
+	}
+	rec := get(e, path+"/contract", a)
+	decode(t, rec, &empty)
+	if rec.Code != http.StatusOK || len(empty.Versions) != 1 || empty.Signature != nil {
+		t.Fatalf("list = %d %s", rec.Code, rec.Body)
+	}
+	if rec := send(e, http.MethodPost, path+"/contract/revision", map[string]string{"note": "Ajuste"}, a); rec.Code != http.StatusCreated {
+		t.Fatalf("revision = %d", rec.Code)
+	}
+	if rec := send(e, http.MethodPost, "/api/portal/"+l.Token+"/sign", signBody(2), nil); rec.Code != http.StatusOK {
+		t.Fatalf("sign = %d", rec.Code)
+	}
+
+	rec = get(e, path+"/contract", a)
+	var list struct {
+		Versions []struct {
+			Number    int    `json:"number"`
+			Hash      string `json:"hash"`
+			Note      string `json:"note"`
+			CreatedAt string `json:"createdAt"`
+		} `json:"versions"`
+		Signature *receipt `json:"signature"`
+	}
+	decode(t, rec, &list)
+	if len(list.Versions) != 2 || list.Versions[0].Number != 2 || list.Versions[0].Note != "Ajuste" || list.Versions[1].Number != 1 || len(list.Versions[1].Hash) != 64 || list.Versions[1].CreatedAt == "" {
+		t.Fatalf("versions = %s", rec.Body)
+	}
+	if list.Signature == nil || list.Signature.Version != 2 || list.Signature.Name != "Ana Souza" {
+		t.Fatalf("signature = %s", rec.Body)
+	}
+	for _, leak := range []string{"content", "\"ip\"", "userAgent"} {
+		if strings.Contains(rec.Body.String(), leak) {
+			t.Errorf("list leaks %q", leak)
+		}
+	}
+	if rec := get(e, path+"/contract", signedUpAs(t, e, "bruno@example.com")); rec.Code != http.StatusNotFound {
+		t.Errorf("other user = %d", rec.Code)
 	}
 }

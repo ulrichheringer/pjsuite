@@ -148,14 +148,7 @@ func (s *server) getProject(c *echo.Context) error {
 	return c.JSON(http.StatusOK, p)
 }
 
-func (s *server) putProject(c *echo.Context) error {
-	current, err := s.findProject(c)
-	if err != nil {
-		return err
-	}
-	if current.Archived {
-		return invalid(c, http.StatusConflict, fieldErrors{"archived": "Projeto arquivado."})
-	}
+func (s *server) putProject(c *echo.Context, current project) error {
 	p, errs, err := s.bindProject(c, current.ClientID)
 	if err != nil {
 		return err
