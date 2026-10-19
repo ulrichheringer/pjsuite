@@ -205,3 +205,80 @@ func TestExecutionIsPrivateToTheOwner(t *testing.T) {
 		t.Errorf("toggle unknown = %d", rec.Code)
 	}
 }
+
+func TestExecutionStageStatusMovesThroughStates(t *testing.T) {
+	e := newServer(t)
+	a := signedUp(t, e)
+	path, _ := signedProject(t, e, a)
+	stage := executionOf(t, e, path, a)[0]
+	statusPath := path + "/stages/" + strconv.Itoa(stage.ID) + "/status"
+
+	for _, status := range []string{"in_progress", "done", "pending"} {
+		if rec := send(e, http.MethodPut, statusPath, map[string]string{"status": status}, a); rec.Code != http.StatusNoContent {
+			t.Fatalf("set %s = %d %s", status, rec.Code, rec.Body)
+		}
+		got := executionOf(t, e, path, a)
+		if got[0].Status != status || got[1].Status != "pending" {
+			t.Fatalf("after %s: %+v", status, got)
+		}
+	}
+}
+
+func TestExecutionStageStatusRejectsBadInput(t *testing.T) {
+	e := newServer(t)
+	a := signedUp(t, e)
+	path, _ := signedProject(t, e, a)
+	statusPath := path + "/stages/1/status"
+
+	for _, body := range []map[string]string{{"status": "finished"}, {"status": ""}, {}} {
+		if rec := send(e, http.MethodPut, statusPath, body, a); rec.Code != http.StatusBadRequest {
+			t.Errorf("%v = %d", body, rec.Code)
+		}
+	}
+	if rec := send(e, http.MethodPut, path+"/stages/999/status", map[string]string{"status": "done"}, a); rec.Code != http.StatusNotFound {
+		t.Errorf("unknown stage = %d", rec.Code)
+	}
+	b := signedUpAs(t, e, "bruno@example.com")
+	if rec := send(e, http.MethodPut, statusPath, map[string]string{"status": "done"}, b); rec.Code != http.StatusNotFound {
+		t.Errorf("other user = %d", rec.Code)
+	}
+	if got := executionOf(t, e, path, a)[0].Status; got != "pending" {
+		t.Fatalf("status = %s", got)
+	}
+}
+
+func TestExecutionStageStatusRequiresSignedProject(t *testing.T) {
+	e := newServer(t)
+	a := signedUp(t, e)
+	path := filledProject(t, e, a)
+
+	rec := send(e, http.MethodPut, path+"/stages/1/status", map[string]string{"status": "done"}, a)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("unsigned = %d", rec.Code)
+	}
+	if got := executionOf(t, e, path, a)[0].Status; got != "pending" {
+		t.Fatalf("status = %s", got)
+	}
+}
+
+func TestExecutionKeepsBuilderFrozenAfterSign(t *testing.T) {
+	e := newServer(t)
+	a := signedUp(t, e)
+	path, _ := signedProject(t, e, a)
+	if rec := send(e, http.MethodPut, path+"/stages/1/status", map[string]string{"status": "in_progress"}, a); rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	for _, w := range []struct {
+		method, suffix string
+		body           any
+	}{
+		{http.MethodPut, "/stages/1", map[string]any{"name": "Novo", "timingKind": "none"}},
+		{http.MethodDelete, "/stages/1", nil},
+		{http.MethodPut, "/stages/order", map[string]any{"ids": []int{2, 1}}},
+		{http.MethodPut, "/builder", map[string]any{"scope": "Novo"}},
+	} {
+		if rec := send(e, w.method, path+w.suffix, w.body, a); rec.Code != http.StatusConflict {
+			t.Errorf("%s %s = %d", w.method, w.suffix, rec.Code)
+		}
+	}
+}

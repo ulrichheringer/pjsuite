@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -160,6 +161,32 @@ func (s *server) deleteTask(c *echo.Context, p project) error {
 	}
 	res, err := s.db.ExecContext(c.Request().Context(),
 		`DELETE FROM stage_tasks WHERE id = ? AND stage_id IN (SELECT id FROM stages WHERE project_id = ?)`, id, p.ID)
+	if err != nil {
+		return err
+	}
+	if err := requireAffected(res); err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+var stageStatuses = []string{"pending", "in_progress", "done"}
+
+func (s *server) putStageStatus(c *echo.Context, p project) error {
+	id, err := stageID(c)
+	if err != nil {
+		return err
+	}
+	var in struct {
+		Status string `json:"status"`
+	}
+	if err := c.Bind(&in); err != nil {
+		return echo.ErrBadRequest
+	}
+	if !slices.Contains(stageStatuses, in.Status) {
+		return invalid(c, http.StatusBadRequest, fieldErrors{"status": "Escolha pendente, em andamento ou concluída."})
+	}
+	res, err := s.db.ExecContext(c.Request().Context(), `UPDATE stages SET status = ? WHERE id = ? AND project_id = ?`, in.Status, id, p.ID)
 	if err != nil {
 		return err
 	}
