@@ -105,3 +105,56 @@ func TestEventsRecordDeliveryCycleAndDuplicateDropsThem(t *testing.T) {
 	decode(t, send(e, http.MethodPost, path+"/duplicate", nil, a), &dup)
 	assertEvents(t, db, "/api/projects/"+strconv.Itoa(dup.ID), "project_created/pro/false")
 }
+
+type eventJSON struct {
+	ID        int    `json:"id"`
+	Kind      string `json:"kind"`
+	Actor     string `json:"actor"`
+	ActorName string `json:"actorName"`
+	Number    int    `json:"number"`
+	Message   string `json:"message"`
+	Shared    bool   `json:"shared"`
+	CreatedAt string `json:"createdAt"`
+}
+
+func TestProjectEventsListNewestFirstOwnerScoped(t *testing.T) {
+	e := newServer(t)
+	a := signedUp(t, e)
+	path, l := finalizedShare(t, e, a)
+	send(e, http.MethodPost, "/api/portal/"+l.Token+"/change", map[string]string{"message": "Trocar prazo"}, nil)
+
+	rec := get(e, path+"/events", a)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("events = %d %s", rec.Code, rec.Body)
+	}
+	var got []eventJSON
+	decode(t, rec, &got)
+	kinds := make([]string, len(got))
+	for i, ev := range got {
+		kinds[i] = ev.Kind
+	}
+	if want := []string{"change_requested", "version_shared", "contract_finalized", "project_created"}; !slices.Equal(kinds, want) {
+		t.Fatalf("kinds = %v, want %v", kinds, want)
+	}
+	first := got[0]
+	if first.Actor != "client" || first.ActorName != "Ana" || first.Number != 1 || first.Message != "Trocar prazo" || !first.Shared || first.CreatedAt == "" {
+		t.Fatalf("first = %+v", first)
+	}
+	if last := got[3]; last.Actor != "pro" || last.ActorName != "Helena Duarte" || last.Shared {
+		t.Fatalf("last = %+v", last)
+	}
+	if strings.Contains(rec.Body.String(), "readAt") {
+		t.Errorf("body exposes readAt: %s", rec.Body)
+	}
+
+	if rec := get(e, path+"/events"); rec.Code != http.StatusUnauthorized {
+		t.Errorf("anonymous = %d", rec.Code)
+	}
+	b := signedUpAs(t, e, "bruno@example.com")
+	if rec := get(e, path+"/events", b); rec.Code != http.StatusNotFound {
+		t.Errorf("other user = %d", rec.Code)
+	}
+	if rec := get(e, "/api/projects/999/events", a); rec.Code != http.StatusNotFound {
+		t.Errorf("unknown project = %d", rec.Code)
+	}
+}

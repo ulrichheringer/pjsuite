@@ -3,6 +3,9 @@ package api
 import (
 	"context"
 	"database/sql"
+	"net/http"
+
+	"github.com/labstack/echo/v5"
 )
 
 type eventKind string
@@ -55,4 +58,40 @@ func recordEvent(ctx context.Context, tx *sql.Tx, projectID int64, ev event) err
 		FROM projects p JOIN clients c ON c.id = p.client_id WHERE p.id = ?`,
 		ev.Kind, ev.actor(), ev.Name, ev.actor(), ev.Number, ev.Message, ev.shared(), projectID)
 	return err
+}
+
+type eventView struct {
+	ID        int64     `json:"id"`
+	Kind      eventKind `json:"kind"`
+	Actor     string    `json:"actor"`
+	ActorName string    `json:"actorName"`
+	Number    int       `json:"number"`
+	Message   string    `json:"message"`
+	Shared    bool      `json:"shared"`
+	CreatedAt string    `json:"createdAt"`
+}
+
+func (s *server) listProjectEvents(c *echo.Context) error {
+	p, err := s.findProject(c)
+	if err != nil {
+		return err
+	}
+	rows, err := s.db.QueryContext(c.Request().Context(),
+		`SELECT id, kind, actor, actor_name, number, message, shared, created_at FROM project_events WHERE project_id = ? ORDER BY id DESC`, p.ID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	list := []eventView{}
+	for rows.Next() {
+		var ev eventView
+		if err := rows.Scan(&ev.ID, &ev.Kind, &ev.Actor, &ev.ActorName, &ev.Number, &ev.Message, &ev.Shared, &ev.CreatedAt); err != nil {
+			return err
+		}
+		list = append(list, ev)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, list)
 }
