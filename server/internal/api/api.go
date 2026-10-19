@@ -8,6 +8,7 @@ import (
 	"github.com/labstack/echo/v5/middleware"
 
 	"github.com/ulrichheringer/pjsuite/server/internal/storage"
+	"github.com/ulrichheringer/pjsuite/server/internal/webui"
 )
 
 const maxJSONBytes = 1 << 20
@@ -100,5 +101,6 @@ func New(db *sql.DB, files storage.Store) *echo.Echo {
 	g.POST("/projects/:id/deliveries/draft/files", s.executableProject(s.uploadDraftFile), s.requireAuth)
 	g.DELETE("/projects/:id/deliveries/draft/files/:fid", s.executableProject(s.deleteDraftFile), s.requireAuth)
 	g.POST("/projects/:id/deliveries/draft/publish", s.executableProject(s.publishDraft), s.requireAuth, bodyLimit)
+	e.GET("/*", webui.Handler(webui.Files()))
 	return e
 }
