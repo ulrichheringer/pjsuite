@@ -15,13 +15,17 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo/v5"
+
+	"github.com/ulrichheringer/pjsuite/server/internal/storage"
 )
 
 const (
 	maxAttachmentBytes = 20 << 20
 	multipartOverhead  = 1 << 20
+	signedURLTTL       = 5 * time.Minute
 )
 
 var (
@@ -161,6 +165,13 @@ func (s *server) downloadAttachment(c *echo.Context) error {
 }
 
 func (s *server) streamObject(c *echo.Context, key string, a attachment) error {
+	if signer, ok := s.files.(storage.Signer); ok {
+		link, err := signer.SignedURL(c.Request().Context(), key, a.Name, a.ContentType, signedURLTTL)
+		if err != nil {
+			return err
+		}
+		return c.Redirect(http.StatusFound, link)
+	}
 	object, err := s.files.Get(c.Request().Context(), key)
 	if errors.Is(err, fs.ErrNotExist) {
 		return echo.ErrNotFound

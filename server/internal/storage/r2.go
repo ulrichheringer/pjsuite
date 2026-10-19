@@ -5,6 +5,8 @@ import (
 	"errors"
 	"io"
 	"io/fs"
+	"mime"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -18,9 +20,10 @@ type R2 struct {
 }
 
 var (
-	_ Store = (*R2)(nil)
-	_ Store = (*Dir)(nil)
-	_ Store = (*Memory)(nil)
+	_ Store  = (*R2)(nil)
+	_ Signer = (*R2)(nil)
+	_ Store  = (*Dir)(nil)
+	_ Store  = (*Memory)(nil)
 )
 
 func NewR2(accountID, accessKeyID, secretAccessKey, bucket string) *R2 {
@@ -61,4 +64,17 @@ func (r *R2) Get(ctx context.Context, key string) (io.ReadCloser, error) {
 func (r *R2) Delete(ctx context.Context, key string) error {
 	_, err := r.client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: &r.bucket, Key: &key})
 	return err
+}
+
+func (r *R2) SignedURL(ctx context.Context, key, name, contentType string, ttl time.Duration) (string, error) {
+	req, err := s3.NewPresignClient(r.client).PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket:                     &r.bucket,
+		Key:                        &key,
+		ResponseContentDisposition: aws.String(mime.FormatMediaType("attachment", map[string]string{"filename": name})),
+		ResponseContentType:        &contentType,
+	}, s3.WithPresignExpires(ttl))
+	if err != nil {
+		return "", err
+	}
+	return req.URL, nil
 }
