@@ -30,6 +30,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ClientSelect } from "@/project-fields";
+import { ProNav, useNotifications } from "@/pro-nav";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge, Banner, Blank, Button, Field, Loading } from "@/ui";
 
@@ -56,6 +57,7 @@ function ProjectsPage() {
   const [tab, setTab] = useState<"active" | "archived">("active");
   const [failed, setFailed] = useState(false);
   const [query, setQuery] = useState("");
+  const { notifications } = useNotifications();
 
   useEffect(() => {
     Promise.all([listProjects(), listProjects(true)]).then(([current, old]) => {
@@ -76,6 +78,7 @@ function ProjectsPage() {
   return (
     <div className="product">
       <main className="pro-main">
+        <ProNav unread={notifications?.unread ?? 0} />
         <header className="page-heading">
           <div>
             <span className="eyebrow">ESPAÇO DE TRABALHO</span>

@@ -602,3 +602,90 @@ export const approveDelivery = (token: string, number: number, confirm: boolean)
     json("POST", { confirm }),
     async (res) => approvalSchema.parse(await res.json()),
   );
+
+const eventKindSchema = z.enum([
+  "project_created",
+  "contract_finalized",
+  "version_shared",
+  "client_viewed",
+  "change_requested",
+  "refused",
+  "revision_created",
+  "signed",
+  "delivery_published",
+  "adjust_requested",
+  "approved",
+  "completed",
+  "archived",
+]);
+
+export type EventKind = z.infer<typeof eventKindSchema>;
+
+const withMessage = (title: string, message: string) => (message ? `${title}: ${message}` : title);
+
+const eventTitles = {
+  project_created: () => "Projeto criado",
+  contract_finalized: ({ number }) => `Contrato v${number} finalizado`,
+  version_shared: ({ number }) => `Versão ${number} compartilhada`,
+  client_viewed: () => "Projeto visualizado",
+  change_requested: ({ message }) => withMessage("Alteração solicitada", message),
+  refused: ({ message }) => withMessage("Projeto recusado", message),
+  revision_created: ({ number, message }) => withMessage(`Versão ${number} criada`, message),
+  signed: ({ number }) => `Contrato v${number} assinado`,
+  delivery_published: ({ number }) => `Entrega ${number} publicada`,
+  adjust_requested: ({ number, message }) =>
+    withMessage(`Ajuste solicitado na entrega ${number}`, message),
+  approved: ({ number }) => `Entrega ${number} aprovada`,
+  completed: () => "Projeto concluído",
+  archived: () => "Projeto arquivado",
+} as const satisfies Record<EventKind, (event: { number: number; message: string }) => string>;
+
+export const eventTitle = (event: { kind: EventKind; number: number; message: string }) =>
+  eventTitles[event.kind](event);
+
+const portalEventSchema = z.object({
+  kind: eventKindSchema,
+  actor: z.enum(["pro", "client"]),
+  actorName: z.string(),
+  number: z.number(),
+  message: z.string(),
+  createdAt: z.string(),
+});
+
+const projectEventSchema = portalEventSchema.extend({ id: z.number(), shared: z.boolean() });
+
+export type ProjectEvent = z.infer<typeof projectEventSchema>;
+export type PortalEvent = z.infer<typeof portalEventSchema>;
+
+export const getProjectEvents = (projectId: string) =>
+  call(`${projectPath(projectId)}/events`, {}, async (res) =>
+    z.array(projectEventSchema).parse(await res.json()),
+  );
+
+export const getPortalEvents = (token: string) =>
+  call(`${portalPath(token)}/events`, {}, async (res) =>
+    z.array(portalEventSchema).parse(await res.json()),
+  );
+
+const notificationsSchema = z.object({
+  unread: z.number(),
+  items: z.array(
+    portalEventSchema.omit({ actor: true }).extend({
+      id: z.number(),
+      projectId: z.number(),
+      projectName: z.string(),
+      read: z.boolean(),
+    }),
+  ),
+});
+
+export type Notifications = z.infer<typeof notificationsSchema>;
+
+export const getNotifications = () =>
+  call("/api/notifications", {}, async (res) => notificationsSchema.parse(await res.json()));
+
+export const markNotificationRead = (id: number) =>
+  call(`/api/notifications/${id}/read`, { method: "POST" }, none);
+
+export const markAllNotificationsRead = () =>
+  call("/api/notifications/read-all", { method: "POST" }, none);

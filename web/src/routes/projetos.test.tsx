@@ -81,6 +81,17 @@ test("redirects to /entrar on 401", async () => {
   await vi.waitFor(() => expect(router.state.location.pathname).toBe("/entrar"));
 });
 
+test("the projects list nav shows the unread count", async () => {
+  mockFetch((path) =>
+    path === "/api/notifications"
+      ? jsonResponse(200, { unread: 3, items: [] })
+      : jsonResponse(200, []),
+  );
+  renderAt("/projetos");
+
+  expect(await screen.findByRole("link", { name: /Avisos/ })).toHaveTextContent("3");
+});
+
 const client = (id: number, name: string) => ({
   id,
   name,

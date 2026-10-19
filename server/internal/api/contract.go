@@ -60,8 +60,10 @@ func (s *server) finalizeContract(c *echo.Context, p project) error {
 		if err != nil {
 			return err
 		}
-		_, err = tx.ExecContext(ctx, `UPDATE projects SET status = 'final' WHERE id = ?`, p.ID)
-		return err
+		if _, err = tx.ExecContext(ctx, `UPDATE projects SET status = 'final' WHERE id = ?`, p.ID); err != nil {
+			return err
+		}
+		return recordEvent(ctx, tx, p.ID, event{Kind: eventContractFinalized, Number: version.Number})
 	})
 	if errors.Is(err, errContractFinalized) {
 		return invalid(c, http.StatusConflict, fieldErrors{"contract": "O contrato já foi finalizado."})
@@ -99,10 +101,14 @@ func (s *server) reviseContract(c *echo.Context, p project) error {
 		} else if n == 0 {
 			return errRevisionClosed
 		}
-		return tx.QueryRowContext(ctx,
+		err = tx.QueryRowContext(ctx,
 			`INSERT INTO contract_versions (project_id, number, content, hash, note)
 			VALUES (?, (SELECT MAX(number) + 1 FROM contract_versions WHERE project_id = ?), ?, ?, ?) RETURNING number, created_at`,
 			p.ID, p.ID, string(version.Content), version.Hash, note).Scan(&version.Number, &version.CreatedAt)
+		if err != nil {
+			return err
+		}
+		return recordEvent(ctx, tx, p.ID, event{Kind: eventRevisionCreated, Private: p.Status == "final", Number: version.Number, Message: note})
 	})
 	if errors.Is(err, errRevisionClosed) {
 		return invalid(c, http.StatusConflict, fieldErrors{"status": "Este contrato não aceita nova versão."})

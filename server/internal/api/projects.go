@@ -127,7 +127,10 @@ func (s *server) insertProject(c *echo.Context, p project, populate func(ctx con
 		err := tx.QueryRowContext(ctx,
 			`INSERT INTO projects (user_id, client_id, name, area, reference, goal, structure, scope, outcome, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
 			userIDOf(c), p.ClientID, p.Name, p.Area, p.Reference, p.Goal, p.Structure, p.Scope, p.Outcome, p.Notes).Scan(&p.ID)
-		if err != nil || populate == nil {
+		if err != nil {
+			return err
+		}
+		if err := recordEvent(ctx, tx, p.ID, event{Kind: eventProjectCreated}); err != nil || populate == nil {
 			return err
 		}
 		return populate(ctx, tx, p.ID)
@@ -195,8 +198,18 @@ func (s *server) archiveProject(c *echo.Context) error {
 	if p.Status == "signed" {
 		return invalid(c, http.StatusConflict, fieldErrors{"signed": "Contrato assinado não pode ser arquivado."})
 	}
-	if _, err := s.db.ExecContext(c.Request().Context(),
-		`UPDATE projects SET archived_at = COALESCE(archived_at, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) WHERE id = ?`, p.ID); err != nil {
+	err = s.inTx(c, func(ctx context.Context, tx *sql.Tx) error {
+		res, err := tx.ExecContext(ctx,
+			`UPDATE projects SET archived_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ? AND archived_at IS NULL`, p.ID)
+		if err != nil {
+			return err
+		}
+		if n, err := res.RowsAffected(); err != nil || n == 0 {
+			return err
+		}
+		return recordEvent(ctx, tx, p.ID, event{Kind: eventArchived})
+	})
+	if err != nil {
 		return err
 	}
 	return c.NoContent(http.StatusNoContent)

@@ -161,19 +161,25 @@ func (s *server) publishDraft(c *echo.Context, p project) error {
 	if len(errs) > 0 {
 		return invalid(c, http.StatusBadRequest, errs)
 	}
-	res, err := s.db.ExecContext(c.Request().Context(),
-		`UPDATE deliveries SET title = ?, message = ?,
-		number = (SELECT COALESCE(MAX(number), 0) + 1 FROM deliveries WHERE project_id = ?),
-		published_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-		WHERE project_id = ? AND published_at IS NULL AND EXISTS (SELECT 1 FROM delivery_files WHERE delivery_id = deliveries.id)`,
-		title, message, p.ID, p.ID)
+	err := s.inTx(c, func(ctx context.Context, tx *sql.Tx) error {
+		var number int
+		err := tx.QueryRowContext(ctx,
+			`UPDATE deliveries SET title = ?, message = ?,
+			number = (SELECT COALESCE(MAX(number), 0) + 1 FROM deliveries WHERE project_id = ?),
+			published_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+			WHERE project_id = ? AND published_at IS NULL AND EXISTS (SELECT 1 FROM delivery_files WHERE delivery_id = deliveries.id)
+			RETURNING number`,
+			title, message, p.ID, p.ID).Scan(&number)
+		if err != nil {
+			return err
+		}
+		return recordEvent(ctx, tx, p.ID, event{Kind: eventDeliveryPublished, Number: number, Message: title})
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return invalid(c, http.StatusBadRequest, fieldErrors{"files": "Anexe ao menos um arquivo."})
+	}
 	if err != nil {
 		return err
-	}
-	if n, err := res.RowsAffected(); err != nil {
-		return err
-	} else if n == 0 {
-		return invalid(c, http.StatusBadRequest, fieldErrors{"files": "Anexe ao menos um arquivo."})
 	}
 	return c.NoContent(http.StatusNoContent)
 }

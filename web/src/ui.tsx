@@ -314,42 +314,16 @@ export function UploadBox({
     </label>
   );
 }
-export function Timeline({
-  compact = false,
-  client = false,
-  events,
-}: {
-  compact?: boolean;
-  client?: boolean;
-  events?: string[];
-}) {
-  const items = events || [
-    "Projeto concluído · Clara Martins",
-    "Entrega revisada aprovada · Clara Martins",
-    "Entrega revisada publicada · Helena Duarte",
-    "Ajuste solicitado: tons mais naturais · Clara Martins",
-    "Primeira entrega publicada · Helena Duarte",
-    "Contrato v2 assinado · Clara Martins",
-    "Versão 2 compartilhada · Helena Duarte",
-    "Alteração solicitada: início às 14h · Clara Martins",
-    "Projeto visualizado · Clara Martins",
-    ...(!client ? ["Projeto criado · Helena Duarte"] : []),
-  ];
+export function Timeline({ events }: { events: { title: string; author: string; at: string }[] }) {
   return (
     <ol className="timeline">
-      {items.slice(0, compact ? 4 : items.length).map((s, i) => (
-        <li key={s}>
+      {events.map((event, i) => (
+        <li key={`${i}-${event.at}`}>
           <span className="timeline-node" />
           <div>
-            <strong>{s.split(" · ")[0]}</strong>
+            <strong>{event.title}</strong>
             <p>
-              {s.split(" · ")[1] || (events ? "" : "Helena Duarte")}{" "}
-              {!events && (
-                <span>
-                  · {i < 5 ? `${19 - i} nov` : `${27 - i} set`}, 2026 · 14:
-                  {String(32 - i).padStart(2, "0")}
-                </span>
-              )}
+              {event.author} · {new Date(event.at).toLocaleString("pt-BR")}
             </p>
           </div>
         </li>

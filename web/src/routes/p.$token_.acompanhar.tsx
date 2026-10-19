@@ -33,6 +33,9 @@ function ProgressPage() {
               Ver entrega
             </Link>
           ) : null}
+          <Link to="/p/$token/historico" params={{ token }}>
+            Ver histórico
+          </Link>
           <Link to="/p/$token" params={{ token }}>
             Voltar ao contrato
           </Link>

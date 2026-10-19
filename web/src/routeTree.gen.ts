@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AvisosRouteImport } from './routes/avisos'
 import { Route as CadastroRouteImport } from './routes/cadastro'
 import { Route as EntrarRouteImport } from './routes/entrar'
 import { Route as PerfilRouteImport } from './routes/perfil'
@@ -26,11 +27,13 @@ import { Route as PTokenAlteracaoRouteImport } from './routes/p.$token_.alteraca
 import { Route as PTokenAprovarRouteImport } from './routes/p.$token_.aprovar'
 import { Route as PTokenAssinarRouteImport } from './routes/p.$token_.assinar'
 import { Route as PTokenEntregaRouteImport } from './routes/p.$token_.entrega'
+import { Route as PTokenHistoricoRouteImport } from './routes/p.$token_.historico'
 import { Route as PTokenRecusarRouteImport } from './routes/p.$token_.recusar'
 import { Route as ProjetosIdCompartilharRouteImport } from './routes/projetos.$id_.compartilhar'
 import { Route as ProjetosIdConclusaoRouteImport } from './routes/projetos.$id_.conclusao'
 import { Route as ProjetosIdEntregaRouteImport } from './routes/projetos.$id_.entrega'
 import { Route as ProjetosIdExecucaoRouteImport } from './routes/projetos.$id_.execucao'
+import { Route as ProjetosIdHistoricoRouteImport } from './routes/projetos.$id_.historico'
 import { Route as ProjetosIdMontagemRouteImport } from './routes/projetos.$id_.montagem'
 import { Route as ProjetosIdRevisaoRouteImport } from './routes/projetos.$id_.revisao'
 import { Route as ProjetosIdVisibilidadeRouteImport } from './routes/projetos.$id_.visibilidade'
@@ -40,6 +43,11 @@ import { Route as ProjetosIdContratoVersionRouteImport } from './routes/projetos
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AvisosRoute = AvisosRouteImport.update({
+  id: '/avisos',
+  path: '/avisos',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CadastroRoute = CadastroRouteImport.update({
@@ -122,6 +130,11 @@ const PTokenEntregaRoute = PTokenEntregaRouteImport.update({
   path: '/p/$token/entrega',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PTokenHistoricoRoute = PTokenHistoricoRouteImport.update({
+  id: '/p/$token_/historico',
+  path: '/p/$token/historico',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PTokenRecusarRoute = PTokenRecusarRouteImport.update({
   id: '/p/$token_/recusar',
   path: '/p/$token/recusar',
@@ -145,6 +158,11 @@ const ProjetosIdEntregaRoute = ProjetosIdEntregaRouteImport.update({
 const ProjetosIdExecucaoRoute = ProjetosIdExecucaoRouteImport.update({
   id: '/projetos/$id_/execucao',
   path: '/projetos/$id/execucao',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjetosIdHistoricoRoute = ProjetosIdHistoricoRouteImport.update({
+  id: '/projetos/$id_/historico',
+  path: '/projetos/$id/historico',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProjetosIdMontagemRoute = ProjetosIdMontagemRouteImport.update({
@@ -176,6 +194,7 @@ const ProjetosIdContratoVersionRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/avisos': typeof AvisosRoute
   '/cadastro': typeof CadastroRoute
   '/entrar': typeof EntrarRoute
   '/perfil': typeof PerfilRoute
@@ -192,11 +211,13 @@ export interface FileRoutesByFullPath {
   '/p/$token/aprovar': typeof PTokenAprovarRoute
   '/p/$token/assinar': typeof PTokenAssinarRoute
   '/p/$token/entrega': typeof PTokenEntregaRoute
+  '/p/$token/historico': typeof PTokenHistoricoRoute
   '/p/$token/recusar': typeof PTokenRecusarRoute
   '/projetos/$id/compartilhar': typeof ProjetosIdCompartilharRoute
   '/projetos/$id/conclusao': typeof ProjetosIdConclusaoRoute
   '/projetos/$id/entrega': typeof ProjetosIdEntregaRoute
   '/projetos/$id/execucao': typeof ProjetosIdExecucaoRoute
+  '/projetos/$id/historico': typeof ProjetosIdHistoricoRoute
   '/projetos/$id/montagem': typeof ProjetosIdMontagemRoute
   '/projetos/$id/revisao': typeof ProjetosIdRevisaoRoute
   '/projetos/$id/visibilidade': typeof ProjetosIdVisibilidadeRoute
@@ -205,6 +226,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/avisos': typeof AvisosRoute
   '/cadastro': typeof CadastroRoute
   '/entrar': typeof EntrarRoute
   '/perfil': typeof PerfilRoute
@@ -221,11 +243,13 @@ export interface FileRoutesByTo {
   '/p/$token/aprovar': typeof PTokenAprovarRoute
   '/p/$token/assinar': typeof PTokenAssinarRoute
   '/p/$token/entrega': typeof PTokenEntregaRoute
+  '/p/$token/historico': typeof PTokenHistoricoRoute
   '/p/$token/recusar': typeof PTokenRecusarRoute
   '/projetos/$id/compartilhar': typeof ProjetosIdCompartilharRoute
   '/projetos/$id/conclusao': typeof ProjetosIdConclusaoRoute
   '/projetos/$id/entrega': typeof ProjetosIdEntregaRoute
   '/projetos/$id/execucao': typeof ProjetosIdExecucaoRoute
+  '/projetos/$id/historico': typeof ProjetosIdHistoricoRoute
   '/projetos/$id/montagem': typeof ProjetosIdMontagemRoute
   '/projetos/$id/revisao': typeof ProjetosIdRevisaoRoute
   '/projetos/$id/visibilidade': typeof ProjetosIdVisibilidadeRoute
@@ -235,6 +259,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/avisos': typeof AvisosRoute
   '/cadastro': typeof CadastroRoute
   '/entrar': typeof EntrarRoute
   '/perfil': typeof PerfilRoute
@@ -251,11 +276,13 @@ export interface FileRoutesById {
   '/p/$token_/aprovar': typeof PTokenAprovarRoute
   '/p/$token_/assinar': typeof PTokenAssinarRoute
   '/p/$token_/entrega': typeof PTokenEntregaRoute
+  '/p/$token_/historico': typeof PTokenHistoricoRoute
   '/p/$token_/recusar': typeof PTokenRecusarRoute
   '/projetos/$id_/compartilhar': typeof ProjetosIdCompartilharRoute
   '/projetos/$id_/conclusao': typeof ProjetosIdConclusaoRoute
   '/projetos/$id_/entrega': typeof ProjetosIdEntregaRoute
   '/projetos/$id_/execucao': typeof ProjetosIdExecucaoRoute
+  '/projetos/$id_/historico': typeof ProjetosIdHistoricoRoute
   '/projetos/$id_/montagem': typeof ProjetosIdMontagemRoute
   '/projetos/$id_/revisao': typeof ProjetosIdRevisaoRoute
   '/projetos/$id_/visibilidade': typeof ProjetosIdVisibilidadeRoute
@@ -266,6 +293,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/avisos'
     | '/cadastro'
     | '/entrar'
     | '/perfil'
@@ -282,11 +310,13 @@ export interface FileRouteTypes {
     | '/p/$token/aprovar'
     | '/p/$token/assinar'
     | '/p/$token/entrega'
+    | '/p/$token/historico'
     | '/p/$token/recusar'
     | '/projetos/$id/compartilhar'
     | '/projetos/$id/conclusao'
     | '/projetos/$id/entrega'
     | '/projetos/$id/execucao'
+    | '/projetos/$id/historico'
     | '/projetos/$id/montagem'
     | '/projetos/$id/revisao'
     | '/projetos/$id/visibilidade'
@@ -295,6 +325,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/avisos'
     | '/cadastro'
     | '/entrar'
     | '/perfil'
@@ -311,11 +342,13 @@ export interface FileRouteTypes {
     | '/p/$token/aprovar'
     | '/p/$token/assinar'
     | '/p/$token/entrega'
+    | '/p/$token/historico'
     | '/p/$token/recusar'
     | '/projetos/$id/compartilhar'
     | '/projetos/$id/conclusao'
     | '/projetos/$id/entrega'
     | '/projetos/$id/execucao'
+    | '/projetos/$id/historico'
     | '/projetos/$id/montagem'
     | '/projetos/$id/revisao'
     | '/projetos/$id/visibilidade'
@@ -324,6 +357,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/avisos'
     | '/cadastro'
     | '/entrar'
     | '/perfil'
@@ -340,11 +374,13 @@ export interface FileRouteTypes {
     | '/p/$token_/aprovar'
     | '/p/$token_/assinar'
     | '/p/$token_/entrega'
+    | '/p/$token_/historico'
     | '/p/$token_/recusar'
     | '/projetos/$id_/compartilhar'
     | '/projetos/$id_/conclusao'
     | '/projetos/$id_/entrega'
     | '/projetos/$id_/execucao'
+    | '/projetos/$id_/historico'
     | '/projetos/$id_/montagem'
     | '/projetos/$id_/revisao'
     | '/projetos/$id_/visibilidade'
@@ -354,6 +390,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AvisosRoute: typeof AvisosRoute
   CadastroRoute: typeof CadastroRoute
   EntrarRoute: typeof EntrarRoute
   PerfilRoute: typeof PerfilRoute
@@ -370,11 +407,13 @@ export interface RootRouteChildren {
   PTokenAprovarRoute: typeof PTokenAprovarRoute
   PTokenAssinarRoute: typeof PTokenAssinarRoute
   PTokenEntregaRoute: typeof PTokenEntregaRoute
+  PTokenHistoricoRoute: typeof PTokenHistoricoRoute
   PTokenRecusarRoute: typeof PTokenRecusarRoute
   ProjetosIdCompartilharRoute: typeof ProjetosIdCompartilharRoute
   ProjetosIdConclusaoRoute: typeof ProjetosIdConclusaoRoute
   ProjetosIdEntregaRoute: typeof ProjetosIdEntregaRoute
   ProjetosIdExecucaoRoute: typeof ProjetosIdExecucaoRoute
+  ProjetosIdHistoricoRoute: typeof ProjetosIdHistoricoRoute
   ProjetosIdMontagemRoute: typeof ProjetosIdMontagemRoute
   ProjetosIdRevisaoRoute: typeof ProjetosIdRevisaoRoute
   ProjetosIdVisibilidadeRoute: typeof ProjetosIdVisibilidadeRoute
@@ -389,6 +428,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/avisos': {
+      id: '/avisos'
+      path: '/avisos'
+      fullPath: '/avisos'
+      preLoaderRoute: typeof AvisosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/cadastro': {
@@ -503,6 +549,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PTokenEntregaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/p/$token_/historico': {
+      id: '/p/$token_/historico'
+      path: '/p/$token/historico'
+      fullPath: '/p/$token/historico'
+      preLoaderRoute: typeof PTokenHistoricoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/p/$token_/recusar': {
       id: '/p/$token_/recusar'
       path: '/p/$token/recusar'
@@ -536,6 +589,13 @@ declare module '@tanstack/react-router' {
       path: '/projetos/$id/execucao'
       fullPath: '/projetos/$id/execucao'
       preLoaderRoute: typeof ProjetosIdExecucaoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projetos/$id_/historico': {
+      id: '/projetos/$id_/historico'
+      path: '/projetos/$id/historico'
+      fullPath: '/projetos/$id/historico'
+      preLoaderRoute: typeof ProjetosIdHistoricoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/projetos/$id_/montagem': {
@@ -578,6 +638,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AvisosRoute: AvisosRoute,
   CadastroRoute: CadastroRoute,
   EntrarRoute: EntrarRoute,
   PerfilRoute: PerfilRoute,
@@ -594,11 +655,13 @@ const rootRouteChildren: RootRouteChildren = {
   PTokenAprovarRoute: PTokenAprovarRoute,
   PTokenAssinarRoute: PTokenAssinarRoute,
   PTokenEntregaRoute: PTokenEntregaRoute,
+  PTokenHistoricoRoute: PTokenHistoricoRoute,
   PTokenRecusarRoute: PTokenRecusarRoute,
   ProjetosIdCompartilharRoute: ProjetosIdCompartilharRoute,
   ProjetosIdConclusaoRoute: ProjetosIdConclusaoRoute,
   ProjetosIdEntregaRoute: ProjetosIdEntregaRoute,
   ProjetosIdExecucaoRoute: ProjetosIdExecucaoRoute,
+  ProjetosIdHistoricoRoute: ProjetosIdHistoricoRoute,
   ProjetosIdMontagemRoute: ProjetosIdMontagemRoute,
   ProjetosIdRevisaoRoute: ProjetosIdRevisaoRoute,
   ProjetosIdVisibilidadeRoute: ProjetosIdVisibilidadeRoute,

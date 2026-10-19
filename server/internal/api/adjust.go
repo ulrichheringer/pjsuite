@@ -57,7 +57,10 @@ func (s *server) postApprove(c *echo.Context) error {
 	return c.JSON(http.StatusOK, r)
 }
 
-var errResponseClosed = errors.New("delivery no longer accepts responses")
+var (
+	errResponseClosed = errors.New("delivery no longer accepts responses")
+	errNotApproved    = errors.New("latest delivery not approved")
+)
 
 func (s *server) responseFailure(c *echo.Context, err error) error {
 	if errors.Is(err, errResponseClosed) {
@@ -91,7 +94,14 @@ func (s *server) respond(c *echo.Context, kind, message string) (approvalReceipt
 			AND d.number = (SELECT MAX(number) FROM deliveries WHERE project_id = d.project_id)
 			ON CONFLICT DO NOTHING RETURNING created_at`, kind, message, projectID, number).Scan(&r.ApprovedAt)
 		if err == nil {
-			return tx.QueryRowContext(ctx, `SELECT title FROM deliveries WHERE project_id = ? AND number = ?`, projectID, number).Scan(&r.Title)
+			if err := tx.QueryRowContext(ctx, `SELECT title FROM deliveries WHERE project_id = ? AND number = ?`, projectID, number).Scan(&r.Title); err != nil {
+				return err
+			}
+			evKind := eventAdjustRequested
+			if kind == "approve" {
+				evKind = eventApproved
+			}
+			return recordEvent(ctx, tx, projectID, event{Kind: evKind, Client: true, Number: number, Message: message})
 		}
 		if !errors.Is(err, sql.ErrNoRows) {
 			return err
@@ -109,18 +119,27 @@ func (s *server) respond(c *echo.Context, kind, message string) (approvalReceipt
 }
 
 func (s *server) completeProject(c *echo.Context, p project) error {
-	res, err := s.db.ExecContext(c.Request().Context(),
-		`UPDATE projects SET completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-		WHERE id = ? AND EXISTS (
-			SELECT 1 FROM deliveries d JOIN delivery_responses r ON r.delivery_id = d.id
-			WHERE d.project_id = projects.id AND r.kind = 'approve' AND d.number = (SELECT MAX(number) FROM deliveries WHERE project_id = projects.id))`, p.ID)
+	err := s.inTx(c, func(ctx context.Context, tx *sql.Tx) error {
+		res, err := tx.ExecContext(ctx,
+			`UPDATE projects SET completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+			WHERE id = ? AND EXISTS (
+				SELECT 1 FROM deliveries d JOIN delivery_responses r ON r.delivery_id = d.id
+				WHERE d.project_id = projects.id AND r.kind = 'approve' AND d.number = (SELECT MAX(number) FROM deliveries WHERE project_id = projects.id))`, p.ID)
+		if err != nil {
+			return err
+		}
+		if n, err := res.RowsAffected(); err != nil {
+			return err
+		} else if n == 0 {
+			return errNotApproved
+		}
+		return recordEvent(ctx, tx, p.ID, event{Kind: eventCompleted})
+	})
+	if errors.Is(err, errNotApproved) {
+		return invalid(c, http.StatusConflict, fieldErrors{"delivery": "Aprove a última entrega antes de concluir."})
+	}
 	if err != nil {
 		return err
-	}
-	if n, err := res.RowsAffected(); err != nil {
-		return err
-	} else if n == 0 {
-		return invalid(c, http.StatusConflict, fieldErrors{"delivery": "Aprove a última entrega antes de concluir."})
 	}
 	return c.NoContent(http.StatusNoContent)
 }
