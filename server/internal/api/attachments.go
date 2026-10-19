@@ -37,7 +37,14 @@ type attachment struct {
 	CreatedAt   string `json:"createdAt"`
 }
 
-func (s *server) uploadAttachment(c *echo.Context, p project) error {
+type storedUpload struct {
+	Name        string
+	Key         string
+	ContentType string
+	Size        int64
+}
+
+func (s *server) saveUpload(c *echo.Context, record func(ctx context.Context, u storedUpload) error) error {
 	c.Request().Body = http.MaxBytesReader(c.Response(), c.Request().Body, maxAttachmentBytes+multipartOverhead)
 	header, err := c.FormFile("file")
 	var tooLarge *http.MaxBytesError
@@ -60,9 +67,8 @@ func (s *server) uploadAttachment(c *echo.Context, p project) error {
 	if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) && !errors.Is(err, io.EOF) {
 		return err
 	}
-	contentType := http.DetectContentType(sniff[:n])
-	name := filepath.Base(header.Filename)
-	if !slices.Contains(attachmentExtensions, strings.ToLower(filepath.Ext(name))) || !slices.Contains(attachmentTypes, contentType) {
+	u := storedUpload{Name: filepath.Base(header.Filename), ContentType: http.DetectContentType(sniff[:n]), Size: header.Size}
+	if !slices.Contains(attachmentExtensions, strings.ToLower(filepath.Ext(u.Name))) || !slices.Contains(attachmentTypes, u.ContentType) {
 		return invalid(c, http.StatusBadRequest, fieldErrors{"file": "Envie PDF, JPG, PNG ou ZIP."})
 	}
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
@@ -72,19 +78,29 @@ func (s *server) uploadAttachment(c *echo.Context, p project) error {
 	if _, err := rand.Read(raw); err != nil {
 		return err
 	}
-	key := hex.EncodeToString(raw)
+	u.Key = hex.EncodeToString(raw)
 	ctx := c.Request().Context()
-	if err := s.files.Put(ctx, key, file, header.Size, contentType); err != nil {
+	if err := s.files.Put(ctx, u.Key, file, u.Size, u.ContentType); err != nil {
 		return err
 	}
-	a := attachment{Name: name, ContentType: contentType, Size: header.Size}
-	err = s.db.QueryRowContext(ctx,
-		`INSERT INTO attachments (project_id, key, name, content_type, size) VALUES (?, ?, ?, ?, ?) RETURNING id, created_at`,
-		p.ID, key, a.Name, a.ContentType, a.Size).Scan(&a.ID, &a.CreatedAt)
-	if err != nil {
-		if delErr := s.files.Delete(context.WithoutCancel(ctx), key); delErr != nil {
-			slog.Error("delete orphan attachment", "key", key, "err", delErr)
+	if err := record(ctx, u); err != nil {
+		if delErr := s.files.Delete(context.WithoutCancel(ctx), u.Key); delErr != nil {
+			slog.Error("delete orphan upload", "key", u.Key, "err", delErr)
 		}
+		return err
+	}
+	return nil
+}
+
+func (s *server) uploadAttachment(c *echo.Context, p project) error {
+	var a attachment
+	err := s.saveUpload(c, func(ctx context.Context, u storedUpload) error {
+		a = attachment{Name: u.Name, ContentType: u.ContentType, Size: u.Size}
+		return s.db.QueryRowContext(ctx,
+			`INSERT INTO attachments (project_id, key, name, content_type, size) VALUES (?, ?, ?, ?, ?) RETURNING id, created_at`,
+			p.ID, u.Key, u.Name, u.ContentType, u.Size).Scan(&a.ID, &a.CreatedAt)
+	})
+	if err != nil {
 		return err
 	}
 	return c.JSON(http.StatusCreated, a)
