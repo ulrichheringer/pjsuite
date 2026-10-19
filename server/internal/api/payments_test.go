@@ -3,6 +3,7 @@ package api_test
 import (
 	"net/http"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -145,5 +146,22 @@ func TestPaymentsPutScopedAndWritable(t *testing.T) {
 	}
 	if rec := send(e, http.MethodPut, path+"/payments", body, a); rec.Code != http.StatusConflict {
 		t.Fatalf("archived PUT = %d", rec.Code)
+	}
+}
+
+func TestPaymentsDuplicateCopiesPlan(t *testing.T) {
+	e := newServer(t)
+	a := signedUp(t, e)
+	path := blankProject(t, e, a)
+	body := map[string]any{"priceCents": 987654, "payments": []map[string]any{pay("entrada", 40, "data", "10 nov"), pay("saldo", 60, "antes_entrega", "Final")}}
+	if rec := send(e, http.MethodPut, path+"/payments", body, a); rec.Code != http.StatusNoContent {
+		t.Fatalf("PUT = %d", rec.Code)
+	}
+	var copied struct{ ID int }
+	rec := send(e, http.MethodPost, path+"/duplicate", nil, a)
+	decode(t, rec, &copied)
+	copyPath := "/api/projects/" + strconv.Itoa(copied.ID)
+	if want, got := getPayments(t, e, path, a), getPayments(t, e, copyPath, a); !reflect.DeepEqual(want, got) || len(got.Payments) != 2 {
+		t.Fatalf("copy plan = %+v, want %+v", got, want)
 	}
 }

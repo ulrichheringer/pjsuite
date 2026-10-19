@@ -241,12 +241,19 @@ func (s *server) duplicateProject(c *echo.Context) error {
 	if err != nil {
 		return err
 	}
+	srcPlan, err := s.loadPayments(c.Request().Context(), src.ID)
+	if err != nil {
+		return err
+	}
 	return s.insertProject(c, p, func(ctx context.Context, tx *sql.Tx, projectID int64) error {
 		for _, st := range srcStages {
 			if _, err := insertStage(ctx, tx, projectID, st.input()); err != nil {
 				return err
 			}
 		}
-		return nil
+		if _, err := tx.ExecContext(ctx, `UPDATE projects SET price_cents = ? WHERE id = ?`, srcPlan.PriceCents, projectID); err != nil {
+			return err
+		}
+		return insertPayments(ctx, tx, projectID, srcPlan.Payments)
 	})
 }
