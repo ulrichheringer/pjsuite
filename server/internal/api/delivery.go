@@ -6,8 +6,15 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/labstack/echo/v5"
+)
+
+const (
+	maxDeliveryTitleRunes   = 120
+	maxDeliveryMessageRunes = 2000
 )
 
 type delivery struct {
@@ -108,5 +115,41 @@ func (s *server) deleteDraftFile(c *echo.Context, p project) error {
 		return err
 	}
 	s.dropObject(ctx, key)
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (s *server) publishDraft(c *echo.Context, p project) error {
+	var in struct {
+		Title   string `json:"title"`
+		Message string `json:"message"`
+	}
+	if err := c.Bind(&in); err != nil {
+		return echo.ErrBadRequest
+	}
+	title, message := strings.TrimSpace(in.Title), strings.TrimSpace(in.Message)
+	errs := fieldErrors{}
+	if title == "" || utf8.RuneCountInString(title) > maxDeliveryTitleRunes {
+		errs["title"] = "Informe o título (até 120 caracteres)."
+	}
+	if utf8.RuneCountInString(message) > maxDeliveryMessageRunes {
+		errs["message"] = "Use até 2000 caracteres."
+	}
+	if len(errs) > 0 {
+		return invalid(c, http.StatusBadRequest, errs)
+	}
+	res, err := s.db.ExecContext(c.Request().Context(),
+		`UPDATE deliveries SET title = ?, message = ?,
+		number = (SELECT COALESCE(MAX(number), 0) + 1 FROM deliveries WHERE project_id = ?),
+		published_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+		WHERE project_id = ? AND published_at IS NULL AND EXISTS (SELECT 1 FROM delivery_files WHERE delivery_id = deliveries.id)`,
+		title, message, p.ID, p.ID)
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err != nil {
+		return err
+	} else if n == 0 {
+		return invalid(c, http.StatusBadRequest, fieldErrors{"files": "Anexe ao menos um arquivo."})
+	}
 	return c.NoContent(http.StatusNoContent)
 }

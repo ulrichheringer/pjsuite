@@ -2,7 +2,9 @@ package api_test
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/labstack/echo/v5"
@@ -135,5 +137,70 @@ func TestDeliveryRejectsOtherUserUnsignedAndBadFile(t *testing.T) {
 	rec := uploadTo(e, unsigned+"/deliveries/draft/files", "file", "briefing.pdf", attachmentSamples["briefing.pdf"], a)
 	if rec.Code != http.StatusConflict {
 		t.Errorf("unsigned upload = %d", rec.Code)
+	}
+}
+
+func publishDraft(e *echo.Echo, path string, title, message string, a *http.Cookie) *httptest.ResponseRecorder {
+	return send(e, http.MethodPost, path+"/deliveries/draft/publish", map[string]string{"title": title, "message": message}, a)
+}
+
+func TestDeliveryPublishAssignsNumbersAndClearsDraft(t *testing.T) {
+	e, _ := newAttachmentServer(t)
+	a := signedUp(t, e)
+	path, _ := signedProject(t, e, a)
+	url := path + "/deliveries/draft/files"
+
+	uploadTo(e, url, "file", "briefing.pdf", attachmentSamples["briefing.pdf"], a)
+	if rec := publishDraft(e, path, "  Entrega final ", "Segue o material.", a); rec.Code != http.StatusNoContent {
+		t.Fatalf("publish = %d %s", rec.Code, rec.Body)
+	}
+	got := deliveriesOf(t, e, path, a)
+	if got.Draft != nil || len(got.Published) != 1 {
+		t.Fatalf("after first = %+v", got)
+	}
+	first := got.Published[0]
+	if first.Number == nil || *first.Number != 1 || first.Title != "Entrega final" || first.Message != "Segue o material." ||
+		first.PublishedAt == nil || len(first.Files) != 1 || first.Files[0].Name != "briefing.pdf" {
+		t.Fatalf("first = %+v", first)
+	}
+
+	uploadTo(e, url, "file", "logo.png", attachmentSamples["logo.png"], a)
+	if rec := publishDraft(e, path, "Ajustes", "", a); rec.Code != http.StatusNoContent {
+		t.Fatalf("second publish = %d %s", rec.Code, rec.Body)
+	}
+	got = deliveriesOf(t, e, path, a)
+	if got.Draft != nil || len(got.Published) != 2 || *got.Published[0].Number != 2 || got.Published[0].Title != "Ajustes" ||
+		*got.Published[1].Number != 1 || len(got.Published[1].Files) != 1 {
+		t.Fatalf("after second = %+v", got)
+	}
+}
+
+func TestDeliveryPublishRejectsInvalidDrafts(t *testing.T) {
+	e, _ := newAttachmentServer(t)
+	a := signedUp(t, e)
+	path, _ := signedProject(t, e, a)
+
+	if rec := publishDraft(e, path, "Entrega", "", a); rec.Code != http.StatusBadRequest {
+		t.Errorf("no draft = %d", rec.Code)
+	}
+	uploadTo(e, path+"/deliveries/draft/files", "file", "briefing.pdf", attachmentSamples["briefing.pdf"], a)
+	for name, in := range map[string][2]string{
+		"blank title": {"  ", ""},
+		"long title":  {strings.Repeat("a", 121), ""},
+		"long note":   {"Entrega", strings.Repeat("a", 2001)},
+	} {
+		if rec := publishDraft(e, path, in[0], in[1], a); rec.Code != http.StatusBadRequest {
+			t.Errorf("%s = %d", name, rec.Code)
+		}
+	}
+	if got := deliveriesOf(t, e, path, a); got.Draft == nil || len(got.Draft.Files) != 1 || len(got.Published) != 0 {
+		t.Errorf("rejected publish changed state: %+v", got)
+	}
+	b := signedUpAs(t, e, "bruno@example.com")
+	if rec := publishDraft(e, path, "Entrega", "", b); rec.Code != http.StatusNotFound {
+		t.Errorf("other user = %d", rec.Code)
+	}
+	if rec := publishDraft(e, filledProject(t, e, a), "Entrega", "", a); rec.Code != http.StatusConflict {
+		t.Errorf("unsigned = %d", rec.Code)
 	}
 }
