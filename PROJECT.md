@@ -65,6 +65,6 @@ Social login, plans/billing, marketplace, templates marketplace, automated email
 - [x] Revision + sign: new version flow, sign with receipt, immutability enforced
 - [x] Execution: tasks checklist, stage progress, file uploads to stages
 - [x] Delivery: publish delivery, client delivery view, token-checked downloads
-- [ ] Adjustment + approval: adjustment cycle, approve, conclude
+- [x] Adjustment + approval: adjustment cycle, approve, conclude
 - [ ] History + notifications: events timeline (pro and client-shared), pro notifications list
 - [ ] Production: single-binary serving of web build, CI, backups, hosting
