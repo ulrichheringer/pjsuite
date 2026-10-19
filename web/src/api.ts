@@ -666,3 +666,26 @@ export const getPortalEvents = (token: string) =>
   call(`${portalPath(token)}/events`, {}, async (res) =>
     z.array(portalEventSchema).parse(await res.json()),
   );
+
+const notificationsSchema = z.object({
+  unread: z.number(),
+  items: z.array(
+    portalEventSchema.omit({ actor: true }).extend({
+      id: z.number(),
+      projectId: z.number(),
+      projectName: z.string(),
+      read: z.boolean(),
+    }),
+  ),
+});
+
+export type Notifications = z.infer<typeof notificationsSchema>;
+
+export const getNotifications = () =>
+  call("/api/notifications", {}, async (res) => notificationsSchema.parse(await res.json()));
+
+export const markNotificationRead = (id: number) =>
+  call(`/api/notifications/${id}/read`, { method: "POST" }, none);
+
+export const markAllNotificationsRead = () =>
+  call("/api/notifications/read-all", { method: "POST" }, none);
