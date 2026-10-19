@@ -120,6 +120,24 @@ func insertTasks(ctx context.Context, tx *sql.Tx, stageID int64, titles []string
 	return nil
 }
 
+func syncTasks(ctx context.Context, tx *sql.Tx, stageID int64, titles []string) error {
+	for i, title := range titles {
+		res, err := tx.ExecContext(ctx, `UPDATE stage_tasks SET title = ? WHERE stage_id = ? AND position = ?`, title, stageID, i+1)
+		if err != nil {
+			return err
+		}
+		if n, err := res.RowsAffected(); err != nil {
+			return err
+		} else if n == 0 {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO stage_tasks (stage_id, position, title) VALUES (?, ?, ?)`, stageID, i+1, title); err != nil {
+				return err
+			}
+		}
+	}
+	_, err := tx.ExecContext(ctx, `DELETE FROM stage_tasks WHERE stage_id = ? AND position > ?`, stageID, len(titles))
+	return err
+}
+
 func (s *server) loadStages(ctx context.Context, projectID int64) ([]stage, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, name, timing_kind, timing, deliverable, visible FROM stages WHERE project_id = ? ORDER BY position`, projectID)
@@ -247,10 +265,7 @@ func (s *server) putStage(c *echo.Context, p project) error {
 		if err := requireAffected(res); err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, `DELETE FROM stage_tasks WHERE stage_id = ?`, id); err != nil {
-			return err
-		}
-		return insertTasks(ctx, tx, id, in.Tasks)
+		return syncTasks(ctx, tx, id, in.Tasks)
 	})
 	if err != nil {
 		return err

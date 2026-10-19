@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestProjectDuplicateCopiesStructure(t *testing.T) {
+func TestStagesDuplicateCopiesStructure(t *testing.T) {
 	e := newServer(t)
 	a := signedUp(t, e)
 	path := blankProject(t, e, a)

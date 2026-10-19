@@ -58,7 +58,10 @@ export function StageDialog({
             <NativeSelect
               id="stage-timing-kind"
               value={timingKind}
-              onChange={(e) => setTimingKind(e.target.value as TimingKind)}
+              onChange={(e) => {
+                const kind = e.target.value;
+                if (Object.hasOwn(timingKindLabels, kind)) setTimingKind(kind as TimingKind);
+              }}
             >
               {Object.entries(timingKindLabels).map(([kind, label]) => (
                 <NativeSelectOption key={kind} value={kind}>

@@ -45,6 +45,30 @@ func TestStagesUpdateReplacesTasksAndKeepsOrder(t *testing.T) {
 	}
 }
 
+func TestStagesUpdateKeepsTaskIDs(t *testing.T) {
+	e := newServer(t)
+	a := signedUp(t, e)
+	path := blankProject(t, e, a)
+	stage := createdStage(t, e, path, a, map[string]any{"name": "Um", "timingKind": "none", "tasks": []string{"a", "b", "c"}})
+	createdStage(t, e, path, a, map[string]any{"name": "Dois", "timingKind": "none", "tasks": []string{"z"}})
+	ids := func() []any {
+		var out []any
+		for _, task := range listStages(t, e, path, a)[0]["tasks"].([]any) {
+			out = append(out, task.(map[string]any)["id"])
+		}
+		return out
+	}
+	before := ids()
+
+	if rec := send(e, http.MethodPut, stage, map[string]any{"name": "Um", "timingKind": "none", "tasks": []string{"x", "y"}}, a); rec.Code != http.StatusNoContent {
+		t.Fatalf("PUT = %d %s", rec.Code, rec.Body)
+	}
+	after := ids()
+	if len(after) != 2 || after[0] != before[0] || after[1] != before[1] {
+		t.Fatalf("task ids before %v after %v", before, after)
+	}
+}
+
 func TestStagesDelete(t *testing.T) {
 	e := newServer(t)
 	a := signedUp(t, e)

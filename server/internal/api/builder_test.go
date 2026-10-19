@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestBuilderRoundTrip(t *testing.T) {
+func TestStagesBuilderRoundTrip(t *testing.T) {
 	e := newServer(t)
 	a := signedUp(t, e)
 	path := blankProject(t, e, a)
@@ -30,7 +30,7 @@ func TestBuilderRoundTrip(t *testing.T) {
 	}
 }
 
-func TestBuilderValidationAndAccess(t *testing.T) {
+func TestStagesBuilderValidationAndAccess(t *testing.T) {
 	e := newServer(t)
 	a := signedUp(t, e)
 	b := signedUpAs(t, e, "bruno@example.com")
