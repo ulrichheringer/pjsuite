@@ -52,6 +52,49 @@ func TestAdjustClientRequestsOnLatestDeliveryOnce(t *testing.T) {
 	}
 }
 
+func postApprove(e *echo.Echo, token, n string, body any) *httptest.ResponseRecorder {
+	return send(e, http.MethodPost, "/api/portal/"+token+"/deliveries/"+n+"/approve", body, nil)
+}
+
+func TestApproveRequiresConfirmationAndReturnsReceipt(t *testing.T) {
+	e, _ := newAttachmentServer(t)
+	a := signedUp(t, e)
+	path, l := signedProject(t, e, a)
+	confirm := map[string]bool{"confirm": true}
+
+	publishNext(t, e, path, a)
+	assertLinkInvalid(t, postApprove(e, "wrong", "1", confirm))
+	if rec := postApprove(e, l.Token, "7", confirm); rec.Code != http.StatusNotFound {
+		t.Errorf("unknown delivery = %d", rec.Code)
+	}
+	for name, body := range map[string]any{"missing": map[string]string{}, "false": map[string]bool{"confirm": false}} {
+		if rec := postApprove(e, l.Token, "1", body); rec.Code != http.StatusBadRequest {
+			t.Errorf("%s confirm = %d", name, rec.Code)
+		}
+	}
+	rec := postApprove(e, l.Token, "1", confirm)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("approve = %d %s", rec.Code, rec.Body)
+	}
+	var got struct {
+		ApprovedAt string `json:"approvedAt"`
+		Number     int    `json:"number"`
+		Title      string `json:"title"`
+	}
+	decode(t, rec, &got)
+	if got.ApprovedAt == "" || got.Number != 1 || got.Title != "Entrega" {
+		t.Fatalf("receipt = %+v", got)
+	}
+	if rec := postApprove(e, l.Token, "1", confirm); rec.Code != http.StatusConflict {
+		t.Errorf("second response = %d", rec.Code)
+	}
+
+	publishNext(t, e, path, a)
+	if rec := postApprove(e, l.Token, "1", confirm); rec.Code != http.StatusConflict {
+		t.Errorf("superseded delivery = %d", rec.Code)
+	}
+}
+
 func TestAdjustDBRestrictsResponsesAndFreezesCompleted(t *testing.T) {
 	e, db := newServerDB(t)
 	a := signedUp(t, e)

@@ -80,6 +80,7 @@ func New(db *sql.DB, files storage.Store) *echo.Echo {
 	g.POST("/portal/:token/sign", s.postSign, bodyLimit)
 	g.GET("/portal/:token/deliveries/:n/files/:fid", s.downloadPortalFile)
 	g.POST("/portal/:token/deliveries/:n/adjust", s.postAdjust, bodyLimit)
+	g.POST("/portal/:token/deliveries/:n/approve", s.postApprove, bodyLimit)
 	g.GET("/projects/:id/execution", s.getExecution, s.requireAuth)
 	g.POST("/projects/:id/stages/:sid/tasks", s.executableProject(s.addTask), s.requireAuth, bodyLimit)
 	g.PUT("/projects/:id/tasks/:tid", s.executableProject(s.putTask), s.requireAuth, bodyLimit)
