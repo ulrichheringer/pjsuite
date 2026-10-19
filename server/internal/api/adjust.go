@@ -107,3 +107,20 @@ func (s *server) respond(c *echo.Context, kind, message string) (approvalReceipt
 	})
 	return r, err
 }
+
+func (s *server) completeProject(c *echo.Context, p project) error {
+	res, err := s.db.ExecContext(c.Request().Context(),
+		`UPDATE projects SET completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+		WHERE id = ? AND EXISTS (
+			SELECT 1 FROM deliveries d JOIN delivery_responses r ON r.delivery_id = d.id
+			WHERE d.project_id = projects.id AND r.kind = 'approve' AND d.number = (SELECT MAX(number) FROM deliveries WHERE project_id = projects.id))`, p.ID)
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err != nil {
+		return err
+	} else if n == 0 {
+		return invalid(c, http.StatusConflict, fieldErrors{"delivery": "Aprove a última entrega antes de concluir."})
+	}
+	return c.NoContent(http.StatusNoContent)
+}

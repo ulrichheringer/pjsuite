@@ -3,6 +3,7 @@ package api_test
 import (
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -218,6 +219,71 @@ func TestAdjustDBRestrictsResponsesAndFreezesCompleted(t *testing.T) {
 	} {
 		if err := exec(q); err == nil || !strings.Contains(err.Error(), "completed") {
 			t.Errorf("%s on completed project: %v", q, err)
+		}
+	}
+}
+
+func TestCompleteRequiresApprovedLatestDeliveryAndFreezesProject(t *testing.T) {
+	e, _ := newAttachmentServer(t)
+	a := signedUp(t, e)
+	path, l := signedProject(t, e, a)
+	portal := "/api/portal/" + l.Token
+	complete := func(cookie *http.Cookie) int {
+		return send(e, http.MethodPost, path+"/complete", nil, cookie).Code
+	}
+
+	if got := complete(a); got != http.StatusConflict {
+		t.Errorf("no delivery = %d", got)
+	}
+	publishNext(t, e, path, a)
+	if got := complete(a); got != http.StatusConflict {
+		t.Errorf("unanswered = %d", got)
+	}
+	send(e, http.MethodPost, portal+"/deliveries/1/adjust", map[string]string{"message": "Trocar a cor do logo."}, nil)
+	if got := complete(a); got != http.StatusConflict {
+		t.Errorf("adjusting = %d", got)
+	}
+	publishNext(t, e, path, a)
+	if rec := postApprove(e, l.Token, "2", map[string]bool{"confirm": true}); rec.Code != http.StatusOK {
+		t.Fatalf("approve = %d", rec.Code)
+	}
+	b := signedUpAs(t, e, "bruno@example.com")
+	if got := complete(b); got != http.StatusNotFound {
+		t.Errorf("other user = %d", got)
+	}
+	if got := complete(a); got != http.StatusNoContent {
+		t.Fatalf("complete = %d", got)
+	}
+	if got := complete(a); got != http.StatusConflict {
+		t.Errorf("second complete = %d", got)
+	}
+
+	var list struct {
+		Phase       string  `json:"phase"`
+		CompletedAt *string `json:"completedAt"`
+	}
+	decode(t, get(e, path+"/deliveries", a), &list)
+	var view struct {
+		CompletedAt *string `json:"completedAt"`
+	}
+	decode(t, get(e, portal), &view)
+	if list.Phase != "completed" || list.CompletedAt == nil || view.CompletedAt == nil {
+		t.Errorf("completed = %+v / %+v", list, view)
+	}
+
+	stage := path + "/stages/" + strconv.Itoa(executionOf(t, e, path, a)[0].ID)
+	frozen := map[string]int{
+		"draft upload":   uploadTo(e, path+"/deliveries/draft/files", "file", "briefing.pdf", attachmentSamples["briefing.pdf"], a).Code,
+		"publish":        publishDraft(e, path, "Entrega", "", a).Code,
+		"stage upload":   uploadTo(e, stage+"/files", "file", "briefing.pdf", attachmentSamples["briefing.pdf"], a).Code,
+		"stage status":   send(e, http.MethodPut, stage+"/status", map[string]string{"status": "done"}, a).Code,
+		"task":           send(e, http.MethodPost, stage+"/tasks", map[string]string{"title": "Nova tarefa"}, a).Code,
+		"client adjust":  send(e, http.MethodPost, portal+"/deliveries/2/adjust", map[string]string{"message": "Trocar a cor do logo."}, nil).Code,
+		"client approve": postApprove(e, l.Token, "2", map[string]bool{"confirm": true}).Code,
+	}
+	for name, code := range frozen {
+		if code != http.StatusConflict {
+			t.Errorf("%s after completion = %d", name, code)
 		}
 	}
 }
