@@ -303,13 +303,15 @@ export const visibilityLabels = {
   attachments: "Anexos",
 } as const satisfies Record<VisibilityBlock, string>;
 
-export type Visibility = Record<string, boolean>;
+export type Visibility = Partial<Record<VisibilityBlock, boolean>>;
 
 const visibilityPath = (projectId: string) =>
   `/api/projects/${encodeURIComponent(projectId)}/visibility`;
 
 export const getVisibility = (projectId: string) =>
-  call(visibilityPath(projectId), {}, async (res) => z.record(z.boolean()).parse(await res.json()));
+  call(visibilityPath(projectId), {}, async (res) =>
+    z.record(z.enum(visibilityBlocks), z.boolean()).parse(await res.json()),
+  );
 
 export const saveVisibility = (projectId: string, patch: Visibility) =>
   call(visibilityPath(projectId), json("PUT", patch), none);
