@@ -181,3 +181,56 @@ func TestPortalInvalidLinks(t *testing.T) {
 	}
 	assertLinkInvalid(t, get(e, "/api/portal/"+fresh.Token))
 }
+
+func TestPortalChangeRequestPersists(t *testing.T) {
+	e := newServer(t)
+	a := signedUp(t, e)
+	path, l := finalizedShare(t, e, a)
+
+	for _, message := range []string{"", "   ", strings.Repeat("a", 4001)} {
+		if rec := send(e, http.MethodPost, "/api/portal/"+l.Token+"/change", map[string]string{"message": message}, nil); rec.Code != http.StatusBadRequest {
+			t.Errorf("message len %d = %d", len(message), rec.Code)
+		}
+	}
+	rec := send(e, http.MethodPost, "/api/portal/"+l.Token+"/change", map[string]string{"message": "Trocar prazo"}, nil)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("change = %d %s", rec.Code, rec.Body)
+	}
+	var p map[string]any
+	decode(t, get(e, path, a), &p)
+	if p["status"] != "changes_requested" {
+		t.Fatalf("status = %v", p["status"])
+	}
+	var share shareJSON
+	decode(t, get(e, path+"/share", a), &share)
+	if share.Request == nil || share.Request.Kind != "change" || share.Request.Message != "Trocar prazo" || share.Request.Version != 1 {
+		t.Fatalf("request = %+v", share.Request)
+	}
+	assertLinkInvalid(t, send(e, http.MethodPost, "/api/portal/desconhecido/change", map[string]string{"message": "x"}, nil))
+}
+
+func TestPortalRefuseRecordsAndBlocksFurtherRequests(t *testing.T) {
+	e := newServer(t)
+	a := signedUp(t, e)
+	path, l := finalizedShare(t, e, a)
+
+	if rec := send(e, http.MethodPost, "/api/portal/"+l.Token+"/refuse", map[string]string{}, nil); rec.Code != http.StatusNoContent {
+		t.Fatalf("refuse = %d %s", rec.Code, rec.Body)
+	}
+	var p map[string]any
+	decode(t, get(e, path, a), &p)
+	if p["status"] != "refused" {
+		t.Fatalf("status = %v", p["status"])
+	}
+	var share shareJSON
+	decode(t, get(e, path+"/share", a), &share)
+	if share.Request == nil || share.Request.Kind != "refuse" {
+		t.Fatalf("request = %+v", share.Request)
+	}
+	if rec := send(e, http.MethodPost, "/api/portal/"+l.Token+"/refuse", map[string]string{"reason": "x"}, nil); rec.Code != http.StatusConflict {
+		t.Errorf("refuse twice = %d", rec.Code)
+	}
+	if rec := send(e, http.MethodPost, "/api/portal/"+l.Token+"/change", map[string]string{"message": "x"}, nil); rec.Code != http.StatusConflict {
+		t.Errorf("change after refuse = %d", rec.Code)
+	}
+}

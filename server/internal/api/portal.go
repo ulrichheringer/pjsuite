@@ -6,9 +6,15 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/labstack/echo/v5"
 )
+
+const maxRequestRunes = 4000
+
+var errRefused = errors.New("contract refused")
 
 type portalView struct {
 	Version int             `json:"version"`
@@ -50,4 +56,66 @@ func (s *server) getPortal(c *echo.Context) error {
 	}
 	view.Content = json.RawMessage(content)
 	return c.JSON(http.StatusOK, view)
+}
+
+func (s *server) postChange(c *echo.Context) error {
+	var in struct {
+		Message string `json:"message"`
+	}
+	if err := c.Bind(&in); err != nil {
+		return echo.ErrBadRequest
+	}
+	message := strings.TrimSpace(in.Message)
+	if message == "" || utf8.RuneCountInString(message) > maxRequestRunes {
+		return invalid(c, http.StatusBadRequest, fieldErrors{"message": "Descreva a alteração (até 4000 caracteres)."})
+	}
+	return s.recordRequest(c, "change", "changes_requested", message)
+}
+
+func (s *server) postRefuse(c *echo.Context) error {
+	var in struct {
+		Reason string `json:"reason"`
+	}
+	if err := c.Bind(&in); err != nil {
+		return echo.ErrBadRequest
+	}
+	reason := strings.TrimSpace(in.Reason)
+	if utf8.RuneCountInString(reason) > maxRequestRunes {
+		return invalid(c, http.StatusBadRequest, fieldErrors{"reason": "Use até 4000 caracteres."})
+	}
+	return s.recordRequest(c, "refuse", "refused", reason)
+}
+
+func (s *server) recordRequest(c *echo.Context, kind, status, message string) error {
+	err := s.inTx(c, func(ctx context.Context, tx *sql.Tx) error {
+		var projectID int64
+		var current string
+		err := tx.QueryRowContext(ctx,
+			`SELECT p.id, p.status FROM share_links l JOIN projects p ON p.id = l.project_id WHERE l.token = ? AND p.archived_at IS NULL`,
+			c.Param("token")).Scan(&projectID, &current)
+		if err != nil {
+			return err
+		}
+		if current == "refused" {
+			return errRefused
+		}
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO client_requests (project_id, version, kind, message)
+			VALUES (?, (SELECT MAX(number) FROM contract_versions WHERE project_id = ?), ?, ?)`,
+			projectID, projectID, kind, message); err != nil {
+			return err
+		}
+		_, err = tx.ExecContext(ctx, `UPDATE projects SET status = ? WHERE id = ?`, status, projectID)
+		return err
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return linkInvalid(c)
+	}
+	if errors.Is(err, errRefused) {
+		return invalid(c, http.StatusConflict, fieldErrors{"status": "O contrato já foi recusado."})
+	}
+	if err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
 }
