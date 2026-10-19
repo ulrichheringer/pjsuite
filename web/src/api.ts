@@ -357,6 +357,38 @@ export const uploadStageFile = (projectId: string, stageId: number, file: File) 
 export const deleteStageFile = (projectId: string, stageId: number, id: number) =>
   call(stageFileUrl(projectId, stageId, id), { method: "DELETE" }, none);
 
+const deliverySchema = z.object({
+  number: z.number().nullable(),
+  title: z.string(),
+  message: z.string(),
+  publishedAt: z.string().nullable(),
+  files: z.array(attachmentSchema),
+});
+
+const deliveriesSchema = z.object({
+  draft: deliverySchema.nullable(),
+  published: z.array(deliverySchema),
+});
+
+export type Deliveries = z.infer<typeof deliveriesSchema>;
+
+const deliveriesPath = (projectId: string) => `${projectPath(projectId)}/deliveries`;
+
+export const getDeliveries = (projectId: string) =>
+  call(deliveriesPath(projectId), {}, async (res) => deliveriesSchema.parse(await res.json()));
+
+export const uploadDraftFile = (projectId: string, file: File) => {
+  const body = new FormData();
+  body.set("file", file);
+  return call(`${deliveriesPath(projectId)}/draft/files`, { method: "POST", body }, none);
+};
+
+export const deleteDraftFile = (projectId: string, id: number) =>
+  call(`${deliveriesPath(projectId)}/draft/files/${id}`, { method: "DELETE" }, none);
+
+export const publishDelivery = (projectId: string, input: { title: string; message: string }) =>
+  call(`${deliveriesPath(projectId)}/draft/publish`, json("POST", input), none);
+
 export const visibilityBlocks = [
   "scope",
   "stages",
@@ -501,6 +533,17 @@ const portalSchema = z.object({
   content: clientViewSchema,
   signature: receiptSchema.nullable(),
   progress: z.array(z.object({ name: z.string(), status: stageStatusSchema })).optional(),
+  deliveries: z
+    .array(
+      z.object({
+        number: z.number(),
+        title: z.string(),
+        message: z.string(),
+        publishedAt: z.string(),
+        files: z.array(z.object({ id: z.number(), name: z.string(), size: z.number() })),
+      }),
+    )
+    .optional(),
 });
 
 export type Portal = z.infer<typeof portalSchema>;

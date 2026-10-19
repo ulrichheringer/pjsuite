@@ -73,6 +73,11 @@ function ExecutionPage() {
             </Link>
           </Button>
         </header>
+        <Button asChild>
+          <Link to="/projetos/$id/entrega" params={{ id }}>
+            Publicar entrega
+          </Link>
+        </Button>
         {loadFailed && (
           <Banner title="Não foi possível carregar a execução." tone="danger">
             Tente novamente em instantes.

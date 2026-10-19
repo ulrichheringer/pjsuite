@@ -284,3 +284,13 @@ test("the project page has no execution link before signing", async () => {
   expect(await screen.findByRole("heading", { name: "Detalhes do projeto" })).toBeVisible();
   expect(screen.queryByRole("link", { name: /Acompanhar execução/ })).toBeNull();
 });
+
+test("execution links to publishing the delivery", async () => {
+  executionRoutes();
+  renderAt("/projetos/5/execucao");
+
+  expect(await screen.findByRole("link", { name: "Publicar entrega" })).toHaveAttribute(
+    "href",
+    "/projetos/5/entrega",
+  );
+});
