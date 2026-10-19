@@ -28,6 +28,7 @@ const receipt = {
 const portal = (status = "viewed", signature: unknown = null, progress?: unknown) => ({
   version: 1,
   status,
+  completedAt: null,
   content,
   signature,
   progress,
@@ -244,6 +245,7 @@ const deliveries = [
     title: "Ajustes finais",
     message: "Cores corrigidas.",
     publishedAt: "2026-10-20T12:00:00Z",
+    response: null,
     files: [{ id: 9, name: "marca-v2.png", size: 3 * 1024 * 1024 }],
   },
   {
@@ -251,6 +253,11 @@ const deliveries = [
     title: "Primeira entrega",
     message: "",
     publishedAt: "2026-10-18T12:00:00Z",
+    response: {
+      kind: "adjust",
+      message: "Trocar a cor do logo.",
+      createdAt: "2026-10-19T12:00:00Z",
+    },
     files: [{ id: 4, name: "marca.pdf", size: 2048 }],
   },
 ];
@@ -412,4 +419,132 @@ test("the sign screen shows a banner when the server fails", async () => {
   await userEvent.click(screen.getByRole("button", { name: /Assinar/ }));
 
   expect(await screen.findByText("Não foi possível assinar.")).toBeVisible();
+});
+
+const answered = (kind: string) =>
+  deliveries.map((d, i) =>
+    i === 0 ? { ...d, response: { kind, message: "", createdAt: "2026-10-21T12:00:00Z" } } : d,
+  );
+
+test("only the unanswered latest delivery offers adjust and approve", async () => {
+  mockFetch(() => jsonResponse(200, { ...portal("signed", receipt), deliveries }));
+  renderAt("/p/TOK/entrega");
+
+  expect(await screen.findByRole("link", { name: "Solicitar ajuste" })).toHaveAttribute(
+    "href",
+    "/p/TOK/ajuste",
+  );
+  expect(screen.getByRole("link", { name: "Aprovar" })).toHaveAttribute("href", "/p/TOK/aprovar");
+  expect(screen.getAllByRole("link", { name: "Solicitar ajuste" })).toHaveLength(1);
+  expect(screen.getByText("Trocar a cor do logo.")).toBeVisible();
+  cleanup();
+
+  mockFetch(() =>
+    jsonResponse(200, { ...portal("signed", receipt), deliveries: answered("approve") }),
+  );
+  renderAt("/p/TOK/entrega");
+  expect(await screen.findByText("Entrega aprovada.")).toBeVisible();
+  expect(screen.queryByRole("link", { name: "Aprovar" })).toBeNull();
+  cleanup();
+
+  mockFetch(() =>
+    jsonResponse(200, {
+      ...portal("signed", receipt),
+      completedAt: "2026-10-22T12:00:00Z",
+      deliveries,
+    }),
+  );
+  renderAt("/p/TOK/entrega");
+  expect(await screen.findByText("Projeto concluído.")).toBeVisible();
+  expect(screen.queryByRole("link", { name: "Aprovar" })).toBeNull();
+});
+
+const deliveryRoutes = (extra: (path: string, init?: RequestInit) => Response | undefined) =>
+  mockFetch((path, init) => {
+    if (path === "/api/portal/TOK" && !init?.method)
+      return jsonResponse(200, { ...portal("signed", receipt), deliveries });
+    return extra(path, init) ?? jsonResponse(500);
+  });
+
+test("the adjust form posts the request against the latest delivery", async () => {
+  const spy = deliveryRoutes((path, init) =>
+    path === "/api/portal/TOK/deliveries/2/adjust" && init?.method === "POST"
+      ? jsonResponse(204)
+      : undefined,
+  );
+  renderAt("/p/TOK/ajuste");
+
+  const summary = await screen.findByText("Entrega 2 · Ajustes finais");
+  expect(summary.closest(".context-card")).not.toBeNull();
+  await userEvent.type(screen.getByLabelText(/Qual ajuste/), "Aumentar o logo no topo.");
+  await userEvent.click(screen.getByRole("button", { name: "Enviar pedido de ajuste" }));
+
+  expect(await screen.findByText("Pedido de ajuste enviado.")).toBeVisible();
+  const call = spy.mock.calls.find(([path]) => path === "/api/portal/TOK/deliveries/2/adjust")!;
+  expect(JSON.parse(String(call[1]?.body))).toEqual({ message: "Aumentar o logo no topo." });
+});
+
+test("the adjust form shows the field error and the closed-delivery conflict", async () => {
+  let status = 400;
+  deliveryRoutes((path, init) =>
+    path === "/api/portal/TOK/deliveries/2/adjust" && init?.method === "POST"
+      ? jsonResponse(
+          status,
+          status === 400
+            ? { errors: { message: "Descreva o ajuste (de 10 a 2000 caracteres)." } }
+            : { errors: { delivery: "fechada" } },
+        )
+      : undefined,
+  );
+  renderAt("/p/TOK/ajuste");
+
+  await userEvent.type(await screen.findByLabelText(/Qual ajuste/), "x");
+  await userEvent.click(screen.getByRole("button", { name: "Enviar pedido de ajuste" }));
+  expect(await screen.findByText("Descreva o ajuste (de 10 a 2000 caracteres).")).toBeVisible();
+
+  status = 409;
+  await userEvent.click(screen.getByRole("button", { name: "Enviar pedido de ajuste" }));
+  expect(await screen.findByText("Esta entrega não aceita mais respostas.")).toBeVisible();
+});
+
+test("the adjust and approve screens have nothing to answer once the latest delivery is answered", async () => {
+  mockFetch(() =>
+    jsonResponse(200, { ...portal("signed", receipt), deliveries: answered("approve") }),
+  );
+  renderAt("/p/TOK/ajuste");
+  expect(await screen.findByText("Esta entrega não aceita mais respostas.")).toBeVisible();
+  expect(screen.queryByRole("button", { name: "Enviar pedido de ajuste" })).toBeNull();
+});
+
+test("the approve screen requires the confirmation and shows the receipt", async () => {
+  let confirmed = false;
+  const spy = deliveryRoutes((path, init) => {
+    if (path !== "/api/portal/TOK/deliveries/2/approve" || init?.method !== "POST")
+      return undefined;
+    confirmed = JSON.parse(String(init.body)).confirm === true;
+    return confirmed
+      ? jsonResponse(200, {
+          approvedAt: "2026-10-21T12:00:00Z",
+          number: 2,
+          title: "Ajustes finais",
+        })
+      : jsonResponse(400, { errors: { confirm: "Confirme a aprovação." } });
+  });
+  renderAt("/p/TOK/aprovar");
+
+  const summary = await screen.findByText("Entrega 2 · Ajustes finais");
+  expect(summary.closest(".context-card")).not.toBeNull();
+
+  await userEvent.click(await screen.findByRole("button", { name: "Aprovar entrega" }));
+  expect(await screen.findByText("Confirme a aprovação.")).toBeVisible();
+
+  await userEvent.click(screen.getByRole("checkbox"));
+  await userEvent.click(screen.getByRole("button", { name: "Aprovar entrega" }));
+
+  expect(await screen.findByText("Entrega aprovada.")).toBeVisible();
+  expect(screen.getByText("Entrega 2 · Ajustes finais")).toBeVisible();
+  expect(screen.getByText(/21\/10\/2026/)).toBeVisible();
+  expect(
+    spy.mock.calls.filter(([path]) => path === "/api/portal/TOK/deliveries/2/approve"),
+  ).toHaveLength(2);
 });

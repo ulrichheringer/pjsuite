@@ -18,18 +18,28 @@ const published = {
   title: "Primeira entrega",
   message: "",
   publishedAt: "2026-10-02T10:00:00Z",
+  response: null,
   files: [{ ...draftFile, id: 8, name: "final.pdf", size: 4096 }],
 };
 
+const draft = {
+  number: null,
+  title: "",
+  message: "",
+  publishedAt: null,
+  response: null,
+  files: [draftFile],
+};
+
 const deliveryRoutes = (
-  served: () => unknown,
+  served: () => object,
   extra?: (path: string, init?: RequestInit) => Response | undefined,
 ) =>
   mockFetch(
     (path, init) =>
       extra?.(path, init) ??
       (path === "/api/projects/5/deliveries" && !init?.method
-        ? jsonResponse(200, served())
+        ? jsonResponse(200, { phase: "executing", completedAt: null, ...served() })
         : jsonResponse(500)),
   );
 
@@ -37,7 +47,7 @@ const emptyDraft = () => ({ draft: null, published: [] });
 
 test("the delivery screen lists the draft files and the published deliveries", async () => {
   deliveryRoutes(() => ({
-    draft: { number: null, title: "", message: "", publishedAt: null, files: [draftFile] },
+    draft,
     published: [published],
   }));
   renderAt("/projetos/5/entrega");
@@ -72,7 +82,7 @@ test("uploading adds a draft file and a rejected type shows the problem", async 
 test("removing a draft file calls the delete endpoint", async () => {
   const spy = deliveryRoutes(
     () => ({
-      draft: { number: null, title: "", message: "", publishedAt: null, files: [draftFile] },
+      draft,
       published: [],
     }),
     (path, init) =>
@@ -99,7 +109,7 @@ test("publishing posts title and message and shows the success banner", async ()
       done
         ? { draft: null, published: [published] }
         : {
-            draft: { number: null, title: "", message: "", publishedAt: null, files: [draftFile] },
+            draft,
             published: [],
           },
     (path, init) => {
@@ -145,4 +155,53 @@ test("the delivery screen shows an error banner when loading fails", async () =>
   renderAt("/projetos/5/entrega");
 
   expect(await screen.findByText("Não foi possível carregar a entrega.")).toBeVisible();
+});
+
+const adjusted = {
+  ...published,
+  response: {
+    kind: "adjust",
+    message: "Trocar a cor do logo.",
+    createdAt: "2026-10-19T10:00:00Z",
+  },
+};
+
+test("an open adjustment request shows the banner and offers to publish a revision", async () => {
+  deliveryRoutes(() => ({ phase: "awaiting_adjustment", draft, published: [adjusted] }));
+  renderAt("/projetos/5/entrega");
+
+  expect(await screen.findByText("Aguardando ajuste")).toBeVisible();
+  expect(screen.getByText("Pedido de ajuste do cliente")).toBeVisible();
+  expect(screen.getByText(/Trocar a cor do logo\./)).toBeVisible();
+  expect(screen.getByText(/19\/10\/2026/)).toBeVisible();
+  expect(screen.getByRole("button", { name: "Publicar revisão" })).toBeVisible();
+  expect(screen.queryByRole("button", { name: "Publicar entrega" })).toBeNull();
+});
+
+test("an approved latest delivery links to the conclusion screen", async () => {
+  const approved = {
+    ...published,
+    response: { kind: "approve", message: "", createdAt: "2026-10-19T10:00:00Z" },
+  };
+  deliveryRoutes(() => ({ draft: null, published: [approved] }));
+  renderAt("/projetos/5/entrega");
+
+  expect(await screen.findByRole("link", { name: "Concluir projeto" })).toHaveAttribute(
+    "href",
+    "/projetos/5/conclusao",
+  );
+});
+
+test("a completed project is frozen on the delivery screen", async () => {
+  deliveryRoutes(() => ({
+    phase: "completed",
+    completedAt: "2026-10-20T10:00:00Z",
+    draft: null,
+    published: [published],
+  }));
+  renderAt("/projetos/5/entrega");
+
+  expect(await screen.findByText("Concluído")).toBeVisible();
+  expect(screen.queryByRole("button", { name: "Publicar entrega" })).toBeNull();
+  expect(screen.getByText("Entrega 1 · Primeira entrega")).toBeVisible();
 });

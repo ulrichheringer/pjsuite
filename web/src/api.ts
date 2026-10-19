@@ -357,25 +357,45 @@ export const uploadStageFile = (projectId: string, stageId: number, file: File) 
 export const deleteStageFile = (projectId: string, stageId: number, id: number) =>
   call(stageFileUrl(projectId, stageId, id), { method: "DELETE" }, none);
 
+const deliveryResponseSchema = z
+  .object({
+    kind: z.enum(["adjust", "approve"]),
+    message: z.string(),
+    createdAt: z.string(),
+  })
+  .nullable();
+
 const deliverySchema = z.object({
   number: z.number().nullable(),
   title: z.string(),
   message: z.string(),
   publishedAt: z.string().nullable(),
+  response: deliveryResponseSchema,
   files: z.array(attachmentSchema),
 });
 
 const deliveriesSchema = z.object({
+  phase: z.enum(["executing", "awaiting_adjustment", "completed"]),
+  completedAt: z.string().nullable(),
   draft: deliverySchema.nullable(),
   published: z.array(deliverySchema),
 });
 
 export type Deliveries = z.infer<typeof deliveriesSchema>;
 
+export const deliveryPhaseLabels = {
+  executing: "Em execução",
+  awaiting_adjustment: "Aguardando ajuste",
+  completed: "Concluído",
+} as const satisfies Record<Deliveries["phase"], string>;
+
 const deliveriesPath = (projectId: string) => `${projectPath(projectId)}/deliveries`;
 
 export const getDeliveries = (projectId: string) =>
   call(deliveriesPath(projectId), {}, async (res) => deliveriesSchema.parse(await res.json()));
+
+export const completeProject = (projectId: string) =>
+  call(`${projectPath(projectId)}/complete`, { method: "POST" }, none);
 
 export const uploadDraftFile = (projectId: string, file: File) => {
   const body = new FormData();
@@ -530,6 +550,7 @@ export type Receipt = z.infer<typeof receiptSchema>;
 const portalSchema = z.object({
   version: z.number(),
   status: projectSchema.shape.status,
+  completedAt: z.string().nullable(),
   content: clientViewSchema,
   signature: receiptSchema.nullable(),
   progress: z.array(z.object({ name: z.string(), status: stageStatusSchema })).optional(),
@@ -540,6 +561,7 @@ const portalSchema = z.object({
         title: z.string(),
         message: z.string(),
         publishedAt: z.string(),
+        response: deliveryResponseSchema,
         files: z.array(z.object({ id: z.number(), name: z.string(), size: z.number() })),
       }),
     )
@@ -565,4 +587,18 @@ export const signContract = (
 ) =>
   call(`${portalPath(token)}/sign`, json("POST", input), async (res) =>
     receiptSchema.parse(await res.json()),
+  );
+
+export const adjustDelivery = (token: string, number: number, message: string) =>
+  call(`${portalPath(token)}/deliveries/${number}/adjust`, json("POST", { message }), none);
+
+const approvalSchema = z.object({ approvedAt: z.string(), number: z.number(), title: z.string() });
+
+export type Approval = z.infer<typeof approvalSchema>;
+
+export const approveDelivery = (token: string, number: number, confirm: boolean) =>
+  call(
+    `${portalPath(token)}/deliveries/${number}/approve`,
+    json("POST", { confirm }),
+    async (res) => approvalSchema.parse(await res.json()),
   );

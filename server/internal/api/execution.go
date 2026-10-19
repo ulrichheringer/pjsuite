@@ -30,6 +30,9 @@ func (s *server) executableProject(handle func(c *echo.Context, p project) error
 		if p.Status != "signed" {
 			return invalid(c, http.StatusConflict, fieldErrors{"execution": "A execução começa após a assinatura."})
 		}
+		if p.Completed {
+			return invalid(c, http.StatusConflict, fieldErrors{"completed": "Projeto concluído."})
+		}
 		return handle(c, p)
 	}
 }

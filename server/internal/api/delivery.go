@@ -17,24 +17,36 @@ const (
 	maxDeliveryMessageRunes = 2000
 )
 
+type deliveryResponse struct {
+	Kind      string `json:"kind"`
+	Message   string `json:"message"`
+	CreatedAt string `json:"createdAt"`
+}
+
 type delivery struct {
-	Number      *int         `json:"number"`
-	Title       string       `json:"title"`
-	Message     string       `json:"message"`
-	PublishedAt *string      `json:"publishedAt"`
-	Files       []attachment `json:"files"`
+	Number      *int              `json:"number"`
+	Title       string            `json:"title"`
+	Message     string            `json:"message"`
+	PublishedAt *string           `json:"publishedAt"`
+	Response    *deliveryResponse `json:"response"`
+	Files       []attachment      `json:"files"`
 }
 
 type deliveryList struct {
-	Draft     *delivery  `json:"draft"`
-	Published []delivery `json:"published"`
+	Phase       string     `json:"phase"`
+	CompletedAt *string    `json:"completedAt"`
+	Draft       *delivery  `json:"draft"`
+	Published   []delivery `json:"published"`
 }
 
 func (s *server) loadDeliveries(ctx context.Context, projectID int64) (deliveryList, error) {
-	list := deliveryList{Published: []delivery{}}
+	list := deliveryList{Phase: "executing", Published: []delivery{}}
+	if err := s.db.QueryRowContext(ctx, `SELECT completed_at FROM projects WHERE id = ?`, projectID).Scan(&list.CompletedAt); err != nil {
+		return list, err
+	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT d.id, d.number, d.title, d.message, d.published_at, f.id, f.name, f.content_type, f.size, f.created_at
-		FROM deliveries d LEFT JOIN delivery_files f ON f.delivery_id = d.id
+		`SELECT d.id, d.number, d.title, d.message, d.published_at, r.kind, r.message, r.created_at, f.id, f.name, f.content_type, f.size, f.created_at
+		FROM deliveries d LEFT JOIN delivery_responses r ON r.delivery_id = d.id LEFT JOIN delivery_files f ON f.delivery_id = d.id
 		WHERE d.project_id = ? ORDER BY d.number DESC, f.id`, projectID)
 	if err != nil {
 		return list, err
@@ -46,12 +58,15 @@ func (s *server) loadDeliveries(ctx context.Context, projectID int64) (deliveryL
 		var id int64
 		var d delivery
 		var fid, size sql.NullInt64
-		var name, contentType, createdAt sql.NullString
-		if err := rows.Scan(&id, &d.Number, &d.Title, &d.Message, &d.PublishedAt, &fid, &name, &contentType, &size, &createdAt); err != nil {
+		var kind, responseMessage, responseAt, name, contentType, createdAt sql.NullString
+		if err := rows.Scan(&id, &d.Number, &d.Title, &d.Message, &d.PublishedAt, &kind, &responseMessage, &responseAt, &fid, &name, &contentType, &size, &createdAt); err != nil {
 			return list, err
 		}
 		if current == nil || id != currentID {
 			d.Files = []attachment{}
+			if kind.Valid {
+				d.Response = &deliveryResponse{Kind: kind.String, Message: responseMessage.String, CreatedAt: responseAt.String}
+			}
 			if d.PublishedAt == nil {
 				list.Draft = &d
 				current = list.Draft
@@ -65,7 +80,16 @@ func (s *server) loadDeliveries(ctx context.Context, projectID int64) (deliveryL
 			current.Files = append(current.Files, attachment{ID: fid.Int64, Name: name.String, ContentType: contentType.String, Size: size.Int64, CreatedAt: createdAt.String})
 		}
 	}
-	return list, rows.Err()
+	if err := rows.Err(); err != nil {
+		return list, err
+	}
+	switch {
+	case list.CompletedAt != nil:
+		list.Phase = "completed"
+	case len(list.Published) > 0 && list.Published[0].Response != nil && list.Published[0].Response.Kind == "adjust":
+		list.Phase = "awaiting_adjustment"
+	}
+	return list, nil
 }
 
 func (s *server) listDeliveries(c *echo.Context) error {
@@ -161,7 +185,7 @@ func (s *server) loadPortalDeliveries(ctx context.Context, projectID int64) (*[]
 	}
 	list := make([]portalDelivery, len(stored.Published))
 	for i, d := range stored.Published {
-		list[i] = portalDelivery{Number: *d.Number, Title: d.Title, Message: d.Message, PublishedAt: *d.PublishedAt, Files: make([]portalFile, len(d.Files))}
+		list[i] = portalDelivery{Number: *d.Number, Title: d.Title, Message: d.Message, PublishedAt: *d.PublishedAt, Response: d.Response, Files: make([]portalFile, len(d.Files))}
 		for j, f := range d.Files {
 			list[i].Files[j] = portalFile{ID: f.ID, Name: f.Name, Size: f.Size}
 		}
