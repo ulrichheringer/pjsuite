@@ -10,6 +10,7 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"github.com/ulrichheringer/pjsuite/server/internal/api"
+	"github.com/ulrichheringer/pjsuite/server/internal/storage"
 	"github.com/ulrichheringer/pjsuite/server/internal/store"
 )
 
@@ -35,7 +36,7 @@ func run() error {
 	}
 
 	sc := echo.StartConfig{Address: env("PJSUITE_ADDR", ":8080")}
-	return sc.Start(ctx, api.New(db))
+	return sc.Start(ctx, api.New(db, storage.NewMemory()))
 }
 
 func env(key, def string) string {

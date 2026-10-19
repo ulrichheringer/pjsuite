@@ -6,14 +6,19 @@ import (
 
 	"github.com/labstack/echo/v5"
 	"github.com/labstack/echo/v5/middleware"
+
+	"github.com/ulrichheringer/pjsuite/server/internal/storage"
 )
 
 const maxJSONBytes = 1 << 20
 
-type server struct{ db *sql.DB }
+type server struct {
+	db    *sql.DB
+	files storage.Store
+}
 
-func New(db *sql.DB) *echo.Echo {
-	s := &server{db: db}
+func New(db *sql.DB, files storage.Store) *echo.Echo {
+	s := &server{db: db, files: files}
 	e := echo.New()
 	e.Use(middleware.Recover())
 	e.Use(middleware.RequestLogger())
