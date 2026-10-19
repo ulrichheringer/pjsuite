@@ -1,9 +1,56 @@
 package api_test
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/labstack/echo/v5"
 )
+
+func publishNext(t *testing.T, e *echo.Echo, path string, a *http.Cookie) {
+	t.Helper()
+	mustUpload(t, e, path+"/deliveries/draft/files", "briefing.pdf", attachmentSamples["briefing.pdf"], a)
+	if rec := publishDraft(e, path, "Entrega", "", a); rec.Code != http.StatusNoContent {
+		t.Fatalf("publish = %d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestAdjustClientRequestsOnLatestDeliveryOnce(t *testing.T) {
+	e, _ := newAttachmentServer(t)
+	a := signedUp(t, e)
+	path, l := signedProject(t, e, a)
+	adjust := func(token, n, message string) *httptest.ResponseRecorder {
+		return send(e, http.MethodPost, "/api/portal/"+token+"/deliveries/"+n+"/adjust", map[string]string{"message": message}, nil)
+	}
+	const ok = "Trocar a cor do logo."
+
+	publishNext(t, e, path, a)
+	assertLinkInvalid(t, adjust("wrong", "1", ok))
+	if rec := adjust(l.Token, "7", ok); rec.Code != http.StatusNotFound {
+		t.Errorf("unknown delivery = %d", rec.Code)
+	}
+	for name, message := range map[string]string{"short": strings.Repeat("a", 9), "blank": "   ", "long": strings.Repeat("a", 2001)} {
+		if rec := adjust(l.Token, "1", message); rec.Code != http.StatusBadRequest {
+			t.Errorf("%s message = %d", name, rec.Code)
+		}
+	}
+	if rec := adjust(l.Token, "1", "  "+ok+" "); rec.Code != http.StatusNoContent {
+		t.Fatalf("adjust = %d %s", rec.Code, rec.Body)
+	}
+	if rec := adjust(l.Token, "1", ok); rec.Code != http.StatusConflict {
+		t.Errorf("second response = %d", rec.Code)
+	}
+
+	publishNext(t, e, path, a)
+	if rec := adjust(l.Token, "1", ok); rec.Code != http.StatusConflict {
+		t.Errorf("superseded delivery = %d", rec.Code)
+	}
+	if rec := adjust(l.Token, "2", ok); rec.Code != http.StatusNoContent {
+		t.Errorf("latest after revision = %d", rec.Code)
+	}
+}
 
 func TestAdjustDBRestrictsResponsesAndFreezesCompleted(t *testing.T) {
 	e, db := newServerDB(t)
