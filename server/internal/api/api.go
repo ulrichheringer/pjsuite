@@ -76,5 +76,6 @@ func New(db *sql.DB, files storage.Store) *echo.Echo {
 	g.GET("/portal/:token", s.getPortal)
 	g.POST("/portal/:token/change", s.postChange, bodyLimit)
 	g.POST("/portal/:token/refuse", s.postRefuse, bodyLimit)
+	g.POST("/portal/:token/sign", s.postSign, bodyLimit)
 	return e
 }

@@ -17,9 +17,10 @@ const maxRequestRunes = 4000
 var errRefused = errors.New("contract refused")
 
 type portalView struct {
-	Version int             `json:"version"`
-	Status  string          `json:"status"`
-	Content json.RawMessage `json:"content"`
+	Version   int             `json:"version"`
+	Status    string          `json:"status"`
+	Content   json.RawMessage `json:"content"`
+	Signature *receipt        `json:"signature"`
 }
 
 func linkInvalid(c *echo.Context) error {
@@ -44,9 +45,22 @@ func (s *server) getPortal(c *echo.Context) error {
 		if _, err := tx.ExecContext(ctx, `UPDATE projects SET status = 'viewed' WHERE id = ? AND status = 'sent'`, projectID); err != nil {
 			return err
 		}
-		return tx.QueryRowContext(ctx,
+		err = tx.QueryRowContext(ctx,
 			`SELECT v.number, v.content, p.status FROM contract_versions v JOIN projects p ON p.id = v.project_id
 			WHERE v.project_id = ? ORDER BY v.number DESC LIMIT 1`, projectID).Scan(&view.Version, &content, &view.Status)
+		if err != nil {
+			return err
+		}
+		var r receipt
+		err = tx.QueryRowContext(ctx, `SELECT name, email, version, hash, signed_at FROM signatures WHERE project_id = ?`, projectID).
+			Scan(&r.Name, &r.Email, &r.Version, &r.Hash, &r.SignedAt)
+		if err == nil {
+			view.Signature = &r
+		}
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		return err
 	})
 	if errors.Is(err, sql.ErrNoRows) {
 		return linkInvalid(c)
