@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ChevronDown, ChevronUp, EyeOff, Pencil, Plus } from "lucide-react";
 import {
   createStage,
@@ -201,7 +201,15 @@ function BuilderPage() {
         </header>
         <div className="stepper">
           {steps.map((step, i) =>
-            i === 0 ? <strong key={step}>{step}</strong> : <span key={step}>{step}</span>,
+            i === 0 ? (
+              <strong key={step}>{step}</strong>
+            ) : i === 1 ? (
+              <Link key={step} to="/projetos/$id/visibilidade" params={{ id }}>
+                {step}
+              </Link>
+            ) : (
+              <span key={step}>{step}</span>
+            ),
           )}
         </div>
         {problem && (

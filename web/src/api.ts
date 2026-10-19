@@ -284,3 +284,63 @@ export const uploadAttachment = (projectId: string, file: File) => {
 
 export const deleteAttachment = (projectId: string, id: number) =>
   call(attachmentUrl(projectId, id), { method: "DELETE" }, none);
+
+export const visibilityBlocks = [
+  "scope",
+  "stages",
+  "deliverables",
+  "price",
+  "attachments",
+] as const;
+
+export type VisibilityBlock = (typeof visibilityBlocks)[number];
+
+export const visibilityLabels = {
+  scope: "Escopo",
+  stages: "Etapas e prazos",
+  deliverables: "Entregáveis",
+  price: "Preço e condições",
+  attachments: "Anexos",
+} as const satisfies Record<VisibilityBlock, string>;
+
+export type Visibility = Record<string, boolean>;
+
+const visibilityPath = (projectId: string) =>
+  `/api/projects/${encodeURIComponent(projectId)}/visibility`;
+
+export const getVisibility = (projectId: string) =>
+  call(visibilityPath(projectId), {}, async (res) => z.record(z.boolean()).parse(await res.json()));
+
+export const saveVisibility = (projectId: string, patch: Visibility) =>
+  call(visibilityPath(projectId), json("PUT", patch), none);
+
+const partySchema = z.object({
+  name: z.string(),
+  company: z.string().optional(),
+  email: z.string().optional(),
+});
+
+export const clientViewSchema = z.object({
+  project: z.string(),
+  reference: z.string().optional(),
+  professional: partySchema,
+  client: partySchema,
+  scope: z.object({ scope: z.string(), outcome: z.string() }).optional(),
+  stages: z
+    .array(
+      z.object({ name: z.string(), timingKind: stageSchema.shape.timingKind, timing: z.string() }),
+    )
+    .optional(),
+  deliverables: z.array(z.object({ stage: z.string(), text: z.string() })).optional(),
+  price: paymentPlanSchema.optional(),
+  attachments: z
+    .array(z.object({ name: z.string(), contentType: z.string(), size: z.number() }))
+    .optional(),
+});
+
+export type ClientView = z.infer<typeof clientViewSchema>;
+
+export const getClientView = (projectId: string) =>
+  call(`/api/projects/${encodeURIComponent(projectId)}/client-view`, {}, async (res) =>
+    clientViewSchema.parse(await res.json()),
+  );

@@ -10,6 +10,7 @@ import {
   type Payment,
 } from "@/api";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { money } from "@/format";
 import { Slider } from "@/components/ui/slider";
 import { Banner, Button, Field, Section } from "@/ui";
 
@@ -29,8 +30,6 @@ const presets: Record<string, Payment[]> = {
     { kind: "unico", percent: 100, trigger: "assinatura", due: "Na assinatura do contrato" },
   ],
 };
-
-const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
 const centsText = (cents: number) =>
   cents % 100 === 0 ? String(cents / 100) : (cents / 100).toFixed(2).replace(".", ",");
