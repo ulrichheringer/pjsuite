@@ -90,26 +90,31 @@ func (s *server) uploadAttachment(c *echo.Context, p project) error {
 	return c.JSON(http.StatusCreated, a)
 }
 
-func (s *server) listAttachments(c *echo.Context) error {
-	p, err := s.findProject(c)
+func (s *server) loadAttachments(ctx context.Context, projectID int64) ([]attachment, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, name, content_type, size, created_at FROM attachments WHERE project_id = ? ORDER BY id`, projectID)
 	if err != nil {
-		return err
-	}
-	rows, err := s.db.QueryContext(c.Request().Context(),
-		`SELECT id, name, content_type, size, created_at FROM attachments WHERE project_id = ? ORDER BY id`, p.ID)
-	if err != nil {
-		return err
+		return nil, err
 	}
 	defer rows.Close()
 	list := []attachment{}
 	for rows.Next() {
 		var a attachment
 		if err := rows.Scan(&a.ID, &a.Name, &a.ContentType, &a.Size, &a.CreatedAt); err != nil {
-			return err
+			return nil, err
 		}
 		list = append(list, a)
 	}
-	if err := rows.Err(); err != nil {
+	return list, rows.Err()
+}
+
+func (s *server) listAttachments(c *echo.Context) error {
+	p, err := s.findProject(c)
+	if err != nil {
+		return err
+	}
+	list, err := s.loadAttachments(c.Request().Context(), p.ID)
+	if err != nil {
 		return err
 	}
 	return c.JSON(http.StatusOK, list)
