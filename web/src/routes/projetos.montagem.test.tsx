@@ -536,10 +536,10 @@ test("attachments card lists files with type, size and a download link", async (
   attachmentRoutes([briefing, stored(9, "mood.png", "image/png", 3 * 1024 * 1024 + 300_000)]);
   renderAt("/projetos/5/montagem");
   const card = (await screen.findByRole("heading", { name: "05 / Anexos" })).closest("section")!;
-  const row = (await within(card).findByText("briefing.pdf")).closest(".file-row")!;
+  const row = (await within(card).findByText("briefing.pdf")).closest<HTMLElement>(".file-row")!;
   expect(row).toHaveTextContent("PDF · 248 KB");
   expect(
-    within(row as HTMLElement).getByRole("link", { name: "Baixar briefing.pdf" }),
+    within(row).getByRole("link", { name: "Baixar briefing.pdf" }),
   ).toHaveAttribute("href", "/api/projects/5/attachments/7");
   expect(within(card).getByText("mood.png").closest(".file-row")).toHaveTextContent("PNG · 3,3 MB");
 });

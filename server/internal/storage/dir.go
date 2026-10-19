@@ -27,13 +27,22 @@ func (d *Dir) Put(_ context.Context, key string, r io.Reader, _ int64, _ string)
 	if err != nil {
 		return err
 	}
-	defer func() { err = errors.Join(err, f.Close()) }()
+	defer func() {
+		err = errors.Join(err, f.Close())
+		if err != nil {
+			err = errors.Join(err, d.root.Remove(key))
+		}
+	}()
 	_, err = io.Copy(f, r)
 	return err
 }
 
 func (d *Dir) Get(_ context.Context, key string) (io.ReadCloser, error) {
-	return d.root.Open(key)
+	f, err := d.root.Open(key)
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
 }
 
 func (d *Dir) Delete(_ context.Context, key string) error {

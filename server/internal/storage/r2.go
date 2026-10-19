@@ -28,6 +28,9 @@ func NewR2(accountID, accessKeyID, secretAccessKey, bucket string) *R2 {
 		Region:       "auto",
 		BaseEndpoint: aws.String("https://" + accountID + ".r2.cloudflarestorage.com"),
 		Credentials:  credentials.NewStaticCredentialsProvider(accessKeyID, secretAccessKey, ""),
+
+		RequestChecksumCalculation: aws.RequestChecksumCalculationWhenRequired,
+		ResponseChecksumValidation: aws.ResponseChecksumValidationWhenRequired,
 	})
 	return &R2{client: client, bucket: bucket}
 }
