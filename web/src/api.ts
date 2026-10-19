@@ -408,3 +408,22 @@ export const regenerateShare = (projectId: string) =>
   call(`${sharePath(projectId)}/regenerate`, { method: "POST" }, async (res) =>
     shareSchema.parse(await res.json()),
   );
+
+const portalSchema = z.object({
+  version: z.number(),
+  status: projectSchema.shape.status,
+  content: clientViewSchema,
+});
+
+export type Portal = z.infer<typeof portalSchema>;
+
+const portalPath = (token: string) => `/api/portal/${encodeURIComponent(token)}`;
+
+export const getPortal = (token: string) =>
+  call(portalPath(token), {}, async (res) => portalSchema.parse(await res.json()));
+
+export const requestChange = (token: string, message: string) =>
+  call(`${portalPath(token)}/change`, json("POST", { message }), none);
+
+export const refuseProject = (token: string, reason: string) =>
+  call(`${portalPath(token)}/refuse`, json("POST", { reason }), none);
