@@ -14,12 +14,13 @@ import (
 
 const maxRequestRunes = 4000
 
-var errRefused = errors.New("contract refused")
+var errRequestClosed = errors.New("contract no longer accepts requests")
 
 type portalView struct {
-	Version int             `json:"version"`
-	Status  string          `json:"status"`
-	Content json.RawMessage `json:"content"`
+	Version   int             `json:"version"`
+	Status    string          `json:"status"`
+	Content   json.RawMessage `json:"content"`
+	Signature *receipt        `json:"signature"`
 }
 
 func linkInvalid(c *echo.Context) error {
@@ -44,9 +45,14 @@ func (s *server) getPortal(c *echo.Context) error {
 		if _, err := tx.ExecContext(ctx, `UPDATE projects SET status = 'viewed' WHERE id = ? AND status = 'sent'`, projectID); err != nil {
 			return err
 		}
-		return tx.QueryRowContext(ctx,
+		err = tx.QueryRowContext(ctx,
 			`SELECT v.number, v.content, p.status FROM contract_versions v JOIN projects p ON p.id = v.project_id
 			WHERE v.project_id = ? ORDER BY v.number DESC LIMIT 1`, projectID).Scan(&view.Version, &content, &view.Status)
+		if err != nil {
+			return err
+		}
+		view.Signature, err = loadReceipt(ctx, tx, projectID)
+		return err
 	})
 	if errors.Is(err, sql.ErrNoRows) {
 		return linkInvalid(c)
@@ -96,14 +102,14 @@ func (s *server) recordRequest(c *echo.Context, kind, status, message string) er
 			return err
 		}
 		res, err := tx.ExecContext(ctx,
-			`UPDATE projects SET status = ? WHERE id = ? AND status <> 'refused'`, status, projectID)
+			`UPDATE projects SET status = ? WHERE id = ? AND status NOT IN ('refused', 'signed')`, status, projectID)
 		if err != nil {
 			return err
 		}
 		if n, err := res.RowsAffected(); err != nil {
 			return err
 		} else if n == 0 {
-			return errRefused
+			return errRequestClosed
 		}
 		_, err = tx.ExecContext(ctx,
 			`INSERT INTO client_requests (project_id, version, kind, message)
@@ -114,8 +120,8 @@ func (s *server) recordRequest(c *echo.Context, kind, status, message string) er
 	if errors.Is(err, sql.ErrNoRows) {
 		return linkInvalid(c)
 	}
-	if errors.Is(err, errRefused) {
-		return invalid(c, http.StatusConflict, fieldErrors{"status": "O contrato já foi recusado."})
+	if errors.Is(err, errRequestClosed) {
+		return invalid(c, http.StatusConflict, fieldErrors{"status": "O contrato já foi recusado ou assinado."})
 	}
 	if err != nil {
 		return err

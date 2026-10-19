@@ -148,14 +148,7 @@ func (s *server) getProject(c *echo.Context) error {
 	return c.JSON(http.StatusOK, p)
 }
 
-func (s *server) putProject(c *echo.Context) error {
-	current, err := s.findProject(c)
-	if err != nil {
-		return err
-	}
-	if current.Archived {
-		return invalid(c, http.StatusConflict, fieldErrors{"archived": "Projeto arquivado."})
-	}
+func (s *server) putProject(c *echo.Context, current project) error {
 	p, errs, err := s.bindProject(c, current.ClientID)
 	if err != nil {
 		return err
@@ -197,6 +190,9 @@ func (s *server) archiveProject(c *echo.Context) error {
 	p, err := s.findProject(c)
 	if err != nil {
 		return err
+	}
+	if p.Status == "signed" {
+		return invalid(c, http.StatusConflict, fieldErrors{"signed": "Contrato assinado não pode ser arquivado."})
 	}
 	if _, err := s.db.ExecContext(c.Request().Context(),
 		`UPDATE projects SET archived_at = COALESCE(archived_at, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) WHERE id = ?`, p.ID); err != nil {

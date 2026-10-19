@@ -49,7 +49,7 @@ func New(db *sql.DB, files storage.Store) *echo.Echo {
 	g.GET("/projects", s.listProjects, s.requireAuth)
 	g.POST("/projects", s.createProject, s.requireAuth, bodyLimit)
 	g.GET("/projects/:id", s.getProject, s.requireAuth)
-	g.PUT("/projects/:id", s.putProject, s.requireAuth, bodyLimit)
+	g.PUT("/projects/:id", s.writableProject(s.putProject), s.requireAuth, bodyLimit)
 	g.POST("/projects/:id/archive", s.archiveProject, s.requireAuth)
 	g.POST("/projects/:id/duplicate", s.duplicateProject, s.requireAuth, bodyLimit)
 	g.GET("/projects/:id/stages", s.listStages, s.requireAuth)
@@ -68,6 +68,8 @@ func New(db *sql.DB, files storage.Store) *echo.Echo {
 	g.PUT("/projects/:id/visibility", s.writableProject(s.putVisibility), s.requireAuth, bodyLimit)
 	g.GET("/projects/:id/client-view", s.getClientView, s.requireAuth)
 	g.POST("/projects/:id/contract", s.writableProject(s.finalizeContract), s.requireAuth)
+	g.GET("/projects/:id/contract", s.listContract, s.requireAuth)
+	g.POST("/projects/:id/contract/revision", s.writableProject(s.reviseContract), s.requireAuth, bodyLimit)
 	g.GET("/projects/:id/contract/:n", s.getContract, s.requireAuth)
 	g.POST("/projects/:id/share", s.writableProject(s.createShare), s.requireAuth)
 	g.POST("/projects/:id/share/regenerate", s.writableProject(s.regenerateShare), s.requireAuth)
@@ -75,5 +77,6 @@ func New(db *sql.DB, files storage.Store) *echo.Echo {
 	g.GET("/portal/:token", s.getPortal)
 	g.POST("/portal/:token/change", s.postChange, bodyLimit)
 	g.POST("/portal/:token/refuse", s.postRefuse, bodyLimit)
+	g.POST("/portal/:token/sign", s.postSign, bodyLimit)
 	return e
 }

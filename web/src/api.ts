@@ -125,7 +125,7 @@ const projectSchema = z.object({
   reference: z.string(),
   goal: z.string(),
   structure: z.enum(["blank", "essential", "suggested"]),
-  status: z.enum(["draft", "final", "sent", "viewed", "changes_requested", "refused"]),
+  status: z.enum(["draft", "final", "sent", "viewed", "changes_requested", "refused", "signed"]),
   archived: z.boolean(),
   scope: z.string(),
   outcome: z.string(),
@@ -141,6 +141,7 @@ export const projectStatusLabels: Record<Project["status"], string> = {
   viewed: "Visto",
   changes_requested: "Alteração solicitada",
   refused: "Recusado",
+  signed: "Assinado",
 };
 
 export const listProjects = (archived = false) =>
@@ -378,6 +379,19 @@ export const getContract = (projectId: string, number: number) =>
     contractSchema.parse(await res.json()),
   );
 
+const versionsSchema = z.object({
+  versions: z.array(
+    z.object({ number: z.number(), hash: z.string(), note: z.string(), createdAt: z.string() }),
+  ),
+  signature: z.object({ name: z.string(), email: z.string(), version: z.number() }).nullable(),
+});
+
+export const listVersions = (projectId: string) =>
+  call(contractPath(projectId), {}, async (res) => versionsSchema.parse(await res.json()));
+
+export const reviseContract = (projectId: string, note: string) =>
+  call(`${contractPath(projectId)}/revision`, json("POST", { note }), none);
+
 const shareSchema = z.object({
   token: z.string(),
   url: z.string(),
@@ -409,10 +423,21 @@ export const regenerateShare = (projectId: string) =>
     shareSchema.parse(await res.json()),
   );
 
+const receiptSchema = z.object({
+  name: z.string(),
+  email: z.string(),
+  version: z.number(),
+  hash: z.string(),
+  signedAt: z.string(),
+});
+
+export type Receipt = z.infer<typeof receiptSchema>;
+
 const portalSchema = z.object({
   version: z.number(),
   status: projectSchema.shape.status,
   content: clientViewSchema,
+  signature: receiptSchema.nullable(),
 });
 
 export type Portal = z.infer<typeof portalSchema>;
@@ -427,3 +452,11 @@ export const requestChange = (token: string, message: string) =>
 
 export const refuseProject = (token: string, reason: string) =>
   call(`${portalPath(token)}/refuse`, json("POST", { reason }), none);
+
+export const signContract = (
+  token: string,
+  input: { version: number; name: string; email: string; consent: boolean },
+) =>
+  call(`${portalPath(token)}/sign`, json("POST", input), async (res) =>
+    receiptSchema.parse(await res.json()),
+  );

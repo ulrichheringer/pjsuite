@@ -128,3 +128,28 @@ test("a failed clipboard write shows an error instead of copied", async () => {
   expect(await screen.findByText("Não foi possível copiar o link.")).toBeVisible();
   expect(screen.queryByText("Link copiado.")).toBeNull();
 });
+
+test("a change request links to the revision screen", async () => {
+  shareRoutes("changes_requested", () =>
+    jsonResponse(200, {
+      ...link,
+      request: { kind: "change", message: "Trocar prazo", version: 1, createdAt: "x" },
+    }),
+  );
+  renderAt("/projetos/5/compartilhar");
+
+  expect(await screen.findByRole("link", { name: /Ajustar e reenviar/ })).toHaveAttribute(
+    "href",
+    "/projetos/5/revisao",
+  );
+});
+
+test("a signed project shows Assinado and offers no new link or revision", async () => {
+  shareRoutes("signed", () => jsonResponse(200, link));
+  renderAt("/projetos/5/compartilhar");
+
+  expect(await screen.findByText("Contrato assinado.")).toBeVisible();
+  expect(screen.getAllByText("Assinado").length).toBeGreaterThan(0);
+  expect(screen.queryByRole("button", { name: /Gerar novo link/ })).toBeNull();
+  expect(screen.queryByRole("link", { name: /Ajustar e reenviar/ })).toBeNull();
+});

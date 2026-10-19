@@ -21,9 +21,11 @@ import { Route as ProjetosIndexRouteImport } from './routes/projetos.index'
 import { Route as ProjetosIdRouteImport } from './routes/projetos.$id'
 import { Route as ProjetosNovoRouteImport } from './routes/projetos.novo'
 import { Route as PTokenAlteracaoRouteImport } from './routes/p.$token_.alteracao'
+import { Route as PTokenAssinarRouteImport } from './routes/p.$token_.assinar'
 import { Route as PTokenRecusarRouteImport } from './routes/p.$token_.recusar'
 import { Route as ProjetosIdCompartilharRouteImport } from './routes/projetos.$id_.compartilhar'
 import { Route as ProjetosIdMontagemRouteImport } from './routes/projetos.$id_.montagem'
+import { Route as ProjetosIdRevisaoRouteImport } from './routes/projetos.$id_.revisao'
 import { Route as ProjetosIdVisibilidadeRouteImport } from './routes/projetos.$id_.visibilidade'
 import { Route as ProjetosIdContratoIndexRouteImport } from './routes/projetos.$id_.contrato.index'
 import { Route as ProjetosIdContratoVersionRouteImport } from './routes/projetos.$id_.contrato.$version'
@@ -88,6 +90,11 @@ const PTokenAlteracaoRoute = PTokenAlteracaoRouteImport.update({
   path: '/p/$token/alteracao',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PTokenAssinarRoute = PTokenAssinarRouteImport.update({
+  id: '/p/$token_/assinar',
+  path: '/p/$token/assinar',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PTokenRecusarRoute = PTokenRecusarRouteImport.update({
   id: '/p/$token_/recusar',
   path: '/p/$token/recusar',
@@ -101,6 +108,11 @@ const ProjetosIdCompartilharRoute = ProjetosIdCompartilharRouteImport.update({
 const ProjetosIdMontagemRoute = ProjetosIdMontagemRouteImport.update({
   id: '/projetos/$id_/montagem',
   path: '/projetos/$id/montagem',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjetosIdRevisaoRoute = ProjetosIdRevisaoRouteImport.update({
+  id: '/projetos/$id_/revisao',
+  path: '/projetos/$id/revisao',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProjetosIdVisibilidadeRoute = ProjetosIdVisibilidadeRouteImport.update({
@@ -133,9 +145,11 @@ export interface FileRoutesByFullPath {
   '/clientes/': typeof ClientesIndexRoute
   '/projetos/': typeof ProjetosIndexRoute
   '/p/$token/alteracao': typeof PTokenAlteracaoRoute
+  '/p/$token/assinar': typeof PTokenAssinarRoute
   '/p/$token/recusar': typeof PTokenRecusarRoute
   '/projetos/$id/compartilhar': typeof ProjetosIdCompartilharRoute
   '/projetos/$id/montagem': typeof ProjetosIdMontagemRoute
+  '/projetos/$id/revisao': typeof ProjetosIdRevisaoRoute
   '/projetos/$id/visibilidade': typeof ProjetosIdVisibilidadeRoute
   '/projetos/$id/contrato/$version': typeof ProjetosIdContratoVersionRoute
   '/projetos/$id/contrato/': typeof ProjetosIdContratoIndexRoute
@@ -153,9 +167,11 @@ export interface FileRoutesByTo {
   '/clientes': typeof ClientesIndexRoute
   '/projetos': typeof ProjetosIndexRoute
   '/p/$token/alteracao': typeof PTokenAlteracaoRoute
+  '/p/$token/assinar': typeof PTokenAssinarRoute
   '/p/$token/recusar': typeof PTokenRecusarRoute
   '/projetos/$id/compartilhar': typeof ProjetosIdCompartilharRoute
   '/projetos/$id/montagem': typeof ProjetosIdMontagemRoute
+  '/projetos/$id/revisao': typeof ProjetosIdRevisaoRoute
   '/projetos/$id/visibilidade': typeof ProjetosIdVisibilidadeRoute
   '/projetos/$id/contrato/$version': typeof ProjetosIdContratoVersionRoute
   '/projetos/$id/contrato': typeof ProjetosIdContratoIndexRoute
@@ -174,9 +190,11 @@ export interface FileRoutesById {
   '/clientes/': typeof ClientesIndexRoute
   '/projetos/': typeof ProjetosIndexRoute
   '/p/$token_/alteracao': typeof PTokenAlteracaoRoute
+  '/p/$token_/assinar': typeof PTokenAssinarRoute
   '/p/$token_/recusar': typeof PTokenRecusarRoute
   '/projetos/$id_/compartilhar': typeof ProjetosIdCompartilharRoute
   '/projetos/$id_/montagem': typeof ProjetosIdMontagemRoute
+  '/projetos/$id_/revisao': typeof ProjetosIdRevisaoRoute
   '/projetos/$id_/visibilidade': typeof ProjetosIdVisibilidadeRoute
   '/projetos/$id_/contrato/$version': typeof ProjetosIdContratoVersionRoute
   '/projetos/$id_/contrato/': typeof ProjetosIdContratoIndexRoute
@@ -196,9 +214,11 @@ export interface FileRouteTypes {
     | '/clientes/'
     | '/projetos/'
     | '/p/$token/alteracao'
+    | '/p/$token/assinar'
     | '/p/$token/recusar'
     | '/projetos/$id/compartilhar'
     | '/projetos/$id/montagem'
+    | '/projetos/$id/revisao'
     | '/projetos/$id/visibilidade'
     | '/projetos/$id/contrato/$version'
     | '/projetos/$id/contrato/'
@@ -216,9 +236,11 @@ export interface FileRouteTypes {
     | '/clientes'
     | '/projetos'
     | '/p/$token/alteracao'
+    | '/p/$token/assinar'
     | '/p/$token/recusar'
     | '/projetos/$id/compartilhar'
     | '/projetos/$id/montagem'
+    | '/projetos/$id/revisao'
     | '/projetos/$id/visibilidade'
     | '/projetos/$id/contrato/$version'
     | '/projetos/$id/contrato'
@@ -236,9 +258,11 @@ export interface FileRouteTypes {
     | '/clientes/'
     | '/projetos/'
     | '/p/$token_/alteracao'
+    | '/p/$token_/assinar'
     | '/p/$token_/recusar'
     | '/projetos/$id_/compartilhar'
     | '/projetos/$id_/montagem'
+    | '/projetos/$id_/revisao'
     | '/projetos/$id_/visibilidade'
     | '/projetos/$id_/contrato/$version'
     | '/projetos/$id_/contrato/'
@@ -257,9 +281,11 @@ export interface RootRouteChildren {
   ClientesIndexRoute: typeof ClientesIndexRoute
   ProjetosIndexRoute: typeof ProjetosIndexRoute
   PTokenAlteracaoRoute: typeof PTokenAlteracaoRoute
+  PTokenAssinarRoute: typeof PTokenAssinarRoute
   PTokenRecusarRoute: typeof PTokenRecusarRoute
   ProjetosIdCompartilharRoute: typeof ProjetosIdCompartilharRoute
   ProjetosIdMontagemRoute: typeof ProjetosIdMontagemRoute
+  ProjetosIdRevisaoRoute: typeof ProjetosIdRevisaoRoute
   ProjetosIdVisibilidadeRoute: typeof ProjetosIdVisibilidadeRoute
   ProjetosIdContratoVersionRoute: typeof ProjetosIdContratoVersionRoute
   ProjetosIdContratoIndexRoute: typeof ProjetosIdContratoIndexRoute
@@ -351,6 +377,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PTokenAlteracaoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/p/$token_/assinar': {
+      id: '/p/$token_/assinar'
+      path: '/p/$token/assinar'
+      fullPath: '/p/$token/assinar'
+      preLoaderRoute: typeof PTokenAssinarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/p/$token_/recusar': {
       id: '/p/$token_/recusar'
       path: '/p/$token/recusar'
@@ -370,6 +403,13 @@ declare module '@tanstack/react-router' {
       path: '/projetos/$id/montagem'
       fullPath: '/projetos/$id/montagem'
       preLoaderRoute: typeof ProjetosIdMontagemRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projetos/$id_/revisao': {
+      id: '/projetos/$id_/revisao'
+      path: '/projetos/$id/revisao'
+      fullPath: '/projetos/$id/revisao'
+      preLoaderRoute: typeof ProjetosIdRevisaoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/projetos/$id_/visibilidade': {
@@ -409,9 +449,11 @@ const rootRouteChildren: RootRouteChildren = {
   ClientesIndexRoute: ClientesIndexRoute,
   ProjetosIndexRoute: ProjetosIndexRoute,
   PTokenAlteracaoRoute: PTokenAlteracaoRoute,
+  PTokenAssinarRoute: PTokenAssinarRoute,
   PTokenRecusarRoute: PTokenRecusarRoute,
   ProjetosIdCompartilharRoute: ProjetosIdCompartilharRoute,
   ProjetosIdMontagemRoute: ProjetosIdMontagemRoute,
+  ProjetosIdRevisaoRoute: ProjetosIdRevisaoRoute,
   ProjetosIdVisibilidadeRoute: ProjetosIdVisibilidadeRoute,
   ProjetosIdContratoVersionRoute: ProjetosIdContratoVersionRoute,
   ProjetosIdContratoIndexRoute: ProjetosIdContratoIndexRoute,
