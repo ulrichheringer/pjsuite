@@ -195,3 +195,106 @@ func (s *server) putStageStatus(c *echo.Context, p project) error {
 	}
 	return c.NoContent(http.StatusNoContent)
 }
+
+func (s *server) requireStage(c *echo.Context, p project) (int64, error) {
+	id, err := stageID(c)
+	if err != nil {
+		return 0, err
+	}
+	var found int64
+	err = s.db.QueryRowContext(c.Request().Context(), `SELECT id FROM stages WHERE id = ? AND project_id = ?`, id, p.ID).Scan(&found)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, echo.ErrNotFound
+	}
+	return found, err
+}
+
+func (s *server) uploadStageFile(c *echo.Context, p project) error {
+	id, err := s.requireStage(c, p)
+	if err != nil {
+		return err
+	}
+	var f attachment
+	err = s.saveUpload(c, func(ctx context.Context, u storedUpload) error {
+		f = attachment{Name: u.Name, ContentType: u.ContentType, Size: u.Size}
+		return s.db.QueryRowContext(ctx,
+			`INSERT INTO stage_files (stage_id, key, name, content_type, size) VALUES (?, ?, ?, ?, ?) RETURNING id, created_at`,
+			id, u.Key, u.Name, u.ContentType, u.Size).Scan(&f.ID, &f.CreatedAt)
+	})
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusCreated, f)
+}
+
+func (s *server) listStageFiles(c *echo.Context) error {
+	p, err := s.findProject(c)
+	if err != nil {
+		return err
+	}
+	id, err := s.requireStage(c, p)
+	if err != nil {
+		return err
+	}
+	rows, err := s.db.QueryContext(c.Request().Context(),
+		`SELECT id, name, content_type, size, created_at FROM stage_files WHERE stage_id = ? ORDER BY id`, id)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	list := []attachment{}
+	for rows.Next() {
+		var f attachment
+		if err := rows.Scan(&f.ID, &f.Name, &f.ContentType, &f.Size, &f.CreatedAt); err != nil {
+			return err
+		}
+		list = append(list, f)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, list)
+}
+
+func (s *server) findStageFile(c *echo.Context, p project) (f attachment, key string, err error) {
+	stageID, err := s.requireStage(c, p)
+	if err != nil {
+		return f, "", err
+	}
+	id, err := strconv.ParseInt(c.Param("fid"), 10, 64)
+	if err != nil {
+		return f, "", echo.ErrNotFound
+	}
+	err = s.db.QueryRowContext(c.Request().Context(),
+		`SELECT id, key, name, content_type, size, created_at FROM stage_files WHERE id = ? AND stage_id = ?`, id, stageID).
+		Scan(&f.ID, &key, &f.Name, &f.ContentType, &f.Size, &f.CreatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return f, "", echo.ErrNotFound
+	}
+	return f, key, err
+}
+
+func (s *server) downloadStageFile(c *echo.Context) error {
+	p, err := s.findProject(c)
+	if err != nil {
+		return err
+	}
+	f, key, err := s.findStageFile(c, p)
+	if err != nil {
+		return err
+	}
+	return s.streamObject(c, key, f)
+}
+
+func (s *server) deleteStageFile(c *echo.Context, p project) error {
+	f, key, err := s.findStageFile(c, p)
+	if err != nil {
+		return err
+	}
+	ctx := c.Request().Context()
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM stage_files WHERE id = ?`, f.ID); err != nil {
+		return err
+	}
+	s.dropObject(ctx, key)
+	return c.NoContent(http.StatusNoContent)
+}

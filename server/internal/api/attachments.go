@@ -84,9 +84,7 @@ func (s *server) saveUpload(c *echo.Context, record func(ctx context.Context, u 
 		return err
 	}
 	if err := record(ctx, u); err != nil {
-		if delErr := s.files.Delete(context.WithoutCancel(ctx), u.Key); delErr != nil {
-			slog.Error("delete orphan upload", "key", u.Key, "err", delErr)
-		}
+		s.dropObject(ctx, u.Key)
 		return err
 	}
 	return nil
@@ -159,6 +157,10 @@ func (s *server) downloadAttachment(c *echo.Context) error {
 	if err != nil {
 		return err
 	}
+	return s.streamObject(c, key, a)
+}
+
+func (s *server) streamObject(c *echo.Context, key string, a attachment) error {
 	object, err := s.files.Get(c.Request().Context(), key)
 	if errors.Is(err, fs.ErrNotExist) {
 		return echo.ErrNotFound
@@ -174,6 +176,12 @@ func (s *server) downloadAttachment(c *echo.Context) error {
 	return c.Stream(http.StatusOK, a.ContentType, object)
 }
 
+func (s *server) dropObject(ctx context.Context, key string) {
+	if err := s.files.Delete(context.WithoutCancel(ctx), key); err != nil {
+		slog.Error("delete object", "key", key, "err", err)
+	}
+}
+
 func (s *server) deleteAttachment(c *echo.Context, p project) error {
 	a, key, err := s.findAttachment(c, p)
 	if err != nil {
@@ -183,8 +191,6 @@ func (s *server) deleteAttachment(c *echo.Context, p project) error {
 	if _, err := s.db.ExecContext(ctx, `DELETE FROM attachments WHERE id = ?`, a.ID); err != nil {
 		return err
 	}
-	if err := s.files.Delete(context.WithoutCancel(ctx), key); err != nil {
-		slog.Error("delete attachment object", "key", key, "err", err)
-	}
+	s.dropObject(ctx, key)
 	return c.NoContent(http.StatusNoContent)
 }

@@ -83,5 +83,9 @@ func New(db *sql.DB, files storage.Store) *echo.Echo {
 	g.PUT("/projects/:id/tasks/:tid", s.executableProject(s.putTask), s.requireAuth, bodyLimit)
 	g.DELETE("/projects/:id/tasks/:tid", s.executableProject(s.deleteTask), s.requireAuth)
 	g.PUT("/projects/:id/stages/:sid/status", s.executableProject(s.putStageStatus), s.requireAuth, bodyLimit)
+	g.GET("/projects/:id/stages/:sid/files", s.listStageFiles, s.requireAuth)
+	g.POST("/projects/:id/stages/:sid/files", s.executableProject(s.uploadStageFile), s.requireAuth)
+	g.GET("/projects/:id/stages/:sid/files/:fid", s.downloadStageFile, s.requireAuth)
+	g.DELETE("/projects/:id/stages/:sid/files/:fid", s.executableProject(s.deleteStageFile), s.requireAuth)
 	return e
 }

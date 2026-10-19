@@ -1,12 +1,16 @@
 package api_test
 
 import (
+	"bytes"
+	"mime"
 	"net/http"
 	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/labstack/echo/v5"
+
+	"github.com/ulrichheringer/pjsuite/server/internal/storage"
 )
 
 func TestExecutionDBRejectsStatusAndFilesUnlessSigned(t *testing.T) {
@@ -280,5 +284,124 @@ func TestExecutionKeepsBuilderFrozenAfterSign(t *testing.T) {
 		if rec := send(e, w.method, path+w.suffix, w.body, a); rec.Code != http.StatusConflict {
 			t.Errorf("%s %s = %d", w.method, w.suffix, rec.Code)
 		}
+	}
+}
+
+func signedWithFiles(t *testing.T) (*echo.Echo, *storage.Memory, *http.Cookie, string, string) {
+	t.Helper()
+	e, files := newAttachmentServer(t)
+	a := signedUp(t, e)
+	path, _ := signedProject(t, e, a)
+	stage := executionOf(t, e, path, a)[0]
+	return e, files, a, path, path + "/stages/" + strconv.Itoa(stage.ID) + "/files"
+}
+
+func TestExecutionStageFilesUploadListDownloadDelete(t *testing.T) {
+	e, files, a, path, url := signedWithFiles(t)
+	data := attachmentSamples["briefing.pdf"]
+
+	rec := uploadTo(e, url, "file", "briefing.pdf", data, a)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("upload = %d %s", rec.Code, rec.Body)
+	}
+	var created attachmentJSON
+	decode(t, rec, &created)
+	if created.ID == 0 || created.Name != "briefing.pdf" || created.Size != int64(len(data)) || files.Len() != 2 {
+		t.Fatalf("created = %+v, objects = %d", created, files.Len())
+	}
+	var listed []attachmentJSON
+	decode(t, get(e, url, a), &listed)
+	if len(listed) != 1 || listed[0] != created {
+		t.Fatalf("list = %+v", listed)
+	}
+	if got := executionOf(t, e, path, a)[0].Files; len(got) != 1 || got[0]["name"] != "briefing.pdf" {
+		t.Fatalf("execution files = %v", got)
+	}
+	if got := executionOf(t, e, path, a)[1].Files; len(got) != 0 {
+		t.Fatalf("other stage files = %v", got)
+	}
+
+	fileURL := url + "/" + strconv.Itoa(created.ID)
+	down := get(e, fileURL, a)
+	if down.Code != http.StatusOK || !bytes.Equal(down.Body.Bytes(), data) {
+		t.Fatalf("download = %d %q", down.Code, down.Body)
+	}
+	kind, params, err := mime.ParseMediaType(down.Header().Get("Content-Disposition"))
+	if err != nil || kind != "attachment" || params["filename"] != "briefing.pdf" || down.Header().Get("X-Content-Type-Options") != "nosniff" {
+		t.Fatalf("headers = %v", down.Header())
+	}
+
+	if rec := send(e, http.MethodDelete, fileURL, nil, a); rec.Code != http.StatusNoContent {
+		t.Fatalf("delete = %d", rec.Code)
+	}
+	if files.Len() != 1 || len(executionOf(t, e, path, a)[0].Files) != 0 {
+		t.Fatal("delete left data behind")
+	}
+	if rec := send(e, http.MethodDelete, fileURL, nil, a); rec.Code != http.StatusNotFound {
+		t.Fatalf("second delete = %d", rec.Code)
+	}
+}
+
+func TestExecutionStageFilesRejectBadUploads(t *testing.T) {
+	pdf := attachmentSamples["briefing.pdf"]
+	tests := []struct {
+		name, file, field string
+		data              []byte
+		status            int
+	}{
+		{"too large", "big.zip", "file", append([]byte{'P', 'K', 3, 4}, make([]byte, 20<<20)...), http.StatusRequestEntityTooLarge},
+		{"bad extension", "notes.txt", "file", pdf, http.StatusBadRequest},
+		{"sniffed type mismatch", "fake.pdf", "file", []byte("just text"), http.StatusBadRequest},
+		{"wrong field", "briefing.pdf", "doc", pdf, http.StatusBadRequest},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			e, files, a, path, url := signedWithFiles(t)
+			if rec := uploadTo(e, url, tc.field, tc.file, tc.data, a); rec.Code != tc.status {
+				t.Fatalf("status = %d, want %d: %.200s", rec.Code, tc.status, rec.Body)
+			}
+			if files.Len() != 1 || len(executionOf(t, e, path, a)[0].Files) != 0 {
+				t.Fatal("rejected upload left data behind")
+			}
+		})
+	}
+}
+
+func TestExecutionStageFilesAreScopedAndSignedOnly(t *testing.T) {
+	e, files, a, _, url := signedWithFiles(t)
+	b := signedUpAs(t, e, "bruno@example.com")
+	pdf := attachmentSamples["briefing.pdf"]
+	var created attachmentJSON
+	decode(t, uploadTo(e, url, "file", "briefing.pdf", pdf, a), &created)
+	fileURL := url + "/" + strconv.Itoa(created.ID)
+
+	if rec := uploadTo(e, url, "file", "x.pdf", pdf, b); rec.Code != http.StatusNotFound {
+		t.Errorf("other user upload = %d", rec.Code)
+	}
+	if rec := get(e, url, b); rec.Code != http.StatusNotFound {
+		t.Errorf("other user list = %d", rec.Code)
+	}
+	if rec := get(e, fileURL, b); rec.Code != http.StatusNotFound {
+		t.Errorf("other user download = %d", rec.Code)
+	}
+	if rec := send(e, http.MethodDelete, fileURL, nil, b); rec.Code != http.StatusNotFound {
+		t.Errorf("other user delete = %d", rec.Code)
+	}
+	if rec := get(e, strings.Replace(url, "/stages/1/", "/stages/2/", 1)+"/"+strconv.Itoa(created.ID), a); rec.Code != http.StatusNotFound {
+		t.Errorf("file through another stage = %d", rec.Code)
+	}
+	if rec := uploadTo(e, "/api/projects/1/stages/999/files", "file", "x.pdf", pdf, a); rec.Code != http.StatusNotFound {
+		t.Errorf("unknown stage upload = %d", rec.Code)
+	}
+	if files.Len() != 2 {
+		t.Fatalf("objects = %d", files.Len())
+	}
+
+	e2, files2 := newAttachmentServer(t)
+	a2 := signedUp(t, e2)
+	draft := filledProject(t, e2, a2)
+	rec := uploadTo(e2, draft+"/stages/1/files", "file", "x.pdf", pdf, a2)
+	if rec.Code != http.StatusConflict || files2.Len() != 1 {
+		t.Errorf("unsigned upload = %d, objects = %d (want 409 and only the attachment)", rec.Code, files2.Len())
 	}
 }
