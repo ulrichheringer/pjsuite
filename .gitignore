@@ -11,3 +11,6 @@ dist/
 .env.*
 !.env.example
 .tanstack/
+!/server/internal/webui/dist/
+/server/internal/webui/dist/*
+!/server/internal/webui/dist/index.html

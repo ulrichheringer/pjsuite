@@ -10,6 +10,10 @@ export default defineConfig({
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
   },
   test: { environment: "jsdom", setupFiles: ["./src/test-setup.ts"] },
+  build: {
+    outDir: fileURLToPath(new URL("../server/internal/webui/dist", import.meta.url)),
+    emptyOutDir: true,
+  },
   server: {
     port: 5173,
     proxy: { "/api": "http://localhost:8080" },
