@@ -129,6 +129,16 @@ export function Choice({
     </div>
   );
 }
+export function Section({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <section className="surface">
+      <div className="row-between section-heading">
+        <h2>{label}</h2>
+      </div>
+      {children}
+    </section>
+  );
+}
 export function Badge({ children }: { children: string }) {
   const type = ["Assinado", "Concluído"].includes(children)
     ? "success"

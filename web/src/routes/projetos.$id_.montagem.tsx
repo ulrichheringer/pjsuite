@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ChevronDown, ChevronUp, EyeOff, Pencil, Plus } from "lucide-react";
 import {
@@ -19,22 +19,11 @@ import {
 } from "@/api";
 import { StageDialog } from "@/stage-dialog";
 import { PaymentPlan } from "@/payment-plan";
-import { Badge, Banner, Button, Field, Loading } from "@/ui";
+import { Badge, Banner, Button, Field, Loading, Section } from "@/ui";
 
 export const Route = createFileRoute("/projetos/$id_/montagem")({ component: BuilderPage });
 
 const steps = ["01 Montagem", "02 Visibilidade", "03 Contrato", "04 Compartilhar"];
-
-function Section({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <section className="surface">
-      <div className="row-between section-heading">
-        <h2>{label}</h2>
-      </div>
-      {children}
-    </section>
-  );
-}
 
 function StageRow({
   stage,

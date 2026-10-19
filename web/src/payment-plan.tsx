@@ -11,7 +11,7 @@ import {
 } from "@/api";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Slider } from "@/components/ui/slider";
-import { Banner, Button, Field } from "@/ui";
+import { Banner, Button, Field, Section } from "@/ui";
 
 type Row = Payment & { key: number };
 
@@ -35,14 +35,23 @@ const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL
 const centsText = (cents: number) =>
   cents % 100 === 0 ? String(cents / 100) : (cents / 100).toFixed(2).replace(".", ",");
 
-const parseCents = (text: string) => Math.round(Number(text.replace(",", ".")) * 100) || 0;
+const parseCents = (text: string) => {
+  const cents = Math.round(Number(text.replace(",", ".")) * 100);
+  return Number.isNaN(cents) ? undefined : cents;
+};
+
+const maxRows = 12;
+
+const choose = <K extends string>(labels: Record<K, string>, value: string) =>
+  (Object.keys(labels) as K[]).find((key) => key === value);
 
 function amounts(priceCents: number, rows: Row[]) {
   const values = rows.map((row) => Math.floor((priceCents * row.percent) / 100));
   const total = rows.reduce((sum, row) => sum + row.percent, 0);
   const remainder =
     Math.floor((priceCents * total) / 100) - values.reduce((sum, value) => sum + value, 0);
-  if (values.length > 0) values[values.length - 1]! += remainder;
+  const last = values.length - 1;
+  if (last >= 0) values[last] = (values[last] ?? 0) + remainder;
   return values;
 }
 
@@ -66,7 +75,8 @@ export function PaymentPlan({ projectId, readOnly }: { projectId: string; readOn
     });
   }, [projectId, navigate]);
 
-  const priceCents = parseCents(priceText);
+  const parsedPrice = parseCents(priceText);
+  const priceCents = parsedPrice ?? 0;
   const distributed = rows.reduce((sum, row) => sum + row.percent, 0);
   const values = amounts(priceCents, rows);
   const edit = (next: Row[]) => {
@@ -75,13 +85,19 @@ export function PaymentPlan({ projectId, readOnly }: { projectId: string; readOn
   };
   const update = (key: number, patch: Partial<Payment>) =>
     edit(rows.map((row) => (row.key === key ? { ...row, ...patch } : row)));
-  const applyPreset = (name: string) =>
-    edit(presets[name]!.map((payment) => ({ ...payment, key: nextKey.current++ })));
+  const applyPreset = (payments: Payment[]) =>
+    edit(payments.map((payment) => ({ ...payment, key: nextKey.current++ })));
 
   async function save() {
+    if (parsedPrice === undefined) {
+      setErrors({ priceCents: "Informe um valor válido." });
+      setProblem(undefined);
+      setSaved(false);
+      return;
+    }
     setPending(true);
     const outcome = await savePayments(projectId, {
-      priceCents,
+      priceCents: parsedPrice,
       payments: rows.map(({ kind, percent, trigger, due }) => ({ kind, percent, trigger, due })),
     });
     setPending(false);
@@ -92,10 +108,7 @@ export function PaymentPlan({ projectId, readOnly }: { projectId: string; readOn
   }
 
   return (
-    <section className="surface">
-      <div className="row-between section-heading">
-        <h2>04 / Investimento e plano de pagamento</h2>
-      </div>
+    <Section label="04 / Investimento e plano de pagamento">
       {loadFailed && (
         <Banner title="Não foi possível carregar o plano de pagamento." tone="danger" />
       )}
@@ -120,8 +133,8 @@ export function PaymentPlan({ projectId, readOnly }: { projectId: string; readOn
           <div className="payment-presets">
             <span className="field-label">Usar uma estrutura</span>
             <div>
-              {Object.keys(presets).map((name) => (
-                <button type="button" key={name} onClick={() => applyPreset(name)}>
+              {Object.entries(presets).map(([name, payments]) => (
+                <button type="button" key={name} onClick={() => applyPreset(payments)}>
                   {name}
                 </button>
               ))}
@@ -137,7 +150,9 @@ export function PaymentPlan({ projectId, readOnly }: { projectId: string; readOn
         <span>
           {distributed === 100
             ? "Plano fechado"
-            : `Faltam ${100 - distributed}% para fechar o valor`}
+            : distributed > 100
+              ? `${distributed - 100}% acima do valor`
+              : `Faltam ${100 - distributed}% para fechar o valor`}
         </span>
       </div>
       <div className="payment-list">
@@ -146,12 +161,12 @@ export function PaymentPlan({ projectId, readOnly }: { projectId: string; readOn
             <div className="payment-card-title">
               <span>{String(index + 1).padStart(2, "0")}</span>
               <strong>{paymentKindLabels[row.kind]}</strong>
-              {!readOnly && rows.length > 1 && (
+              {!readOnly && (
                 <Button
                   variant="ghost"
                   size="icon"
                   aria-label={`Remover ${paymentKindLabels[row.kind]}`}
-                  onClick={() => setRows(rows.filter((item) => item.key !== row.key))}
+                  onClick={() => edit(rows.filter((item) => item.key !== row.key))}
                 >
                   <Trash2 size={16} />
                 </Button>
@@ -164,7 +179,10 @@ export function PaymentPlan({ projectId, readOnly }: { projectId: string; readOn
                   id={`payment-kind-${row.key}`}
                   value={row.kind}
                   disabled={readOnly}
-                  onChange={(e) => update(row.key, { kind: e.target.value as Payment["kind"] })}
+                  onChange={(e) => {
+                    const kind = choose(paymentKindLabels, e.target.value);
+                    if (kind) update(row.key, { kind });
+                  }}
                 >
                   {Object.entries(paymentKindLabels).map(([kind, label]) => (
                     <NativeSelectOption key={kind} value={kind}>
@@ -179,9 +197,10 @@ export function PaymentPlan({ projectId, readOnly }: { projectId: string; readOn
                   id={`payment-trigger-${row.key}`}
                   value={row.trigger}
                   disabled={readOnly}
-                  onChange={(e) =>
-                    update(row.key, { trigger: e.target.value as Payment["trigger"] })
-                  }
+                  onChange={(e) => {
+                    const trigger = choose(paymentTriggerLabels, e.target.value);
+                    if (trigger) update(row.key, { trigger });
+                  }}
                 >
                   {Object.entries(paymentTriggerLabels).map(([trigger, label]) => (
                     <NativeSelectOption key={trigger} value={trigger}>
@@ -203,13 +222,15 @@ export function PaymentPlan({ projectId, readOnly }: { projectId: string; readOn
                   step={5}
                   value={[row.percent]}
                   disabled={readOnly}
-                  onValueChange={([percent]) => update(row.key, { percent: percent! })}
+                  onValueChange={([percent]) => {
+                    if (percent !== undefined) update(row.key, { percent });
+                  }}
                   aria-label={`Percentual de ${paymentKindLabels[row.kind]}`}
                 />
               </div>
               <div className="payment-value">
                 <small>VALOR</small>
-                <strong>{money.format(values[index]! / 100)}</strong>
+                <strong>{money.format((values[index] ?? 0) / 100)}</strong>
               </div>
             </div>
             <Field
@@ -225,8 +246,9 @@ export function PaymentPlan({ projectId, readOnly }: { projectId: string; readOn
       {!readOnly && (
         <Button
           variant="outline"
+          disabled={rows.length >= maxRows}
           onClick={() =>
-            setRows([
+            edit([
               ...rows,
               { key: nextKey.current++, kind: "parcela", percent: 0, trigger: "etapa", due: "" },
             ])
@@ -250,6 +272,6 @@ export function PaymentPlan({ projectId, readOnly }: { projectId: string; readOn
         O PJ Suite organiza o combinado. A cobrança continua acontecendo diretamente entre você e o
         cliente.
       </p>
-    </section>
+    </Section>
   );
 }

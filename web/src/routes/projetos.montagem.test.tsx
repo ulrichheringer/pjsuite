@@ -424,3 +424,61 @@ test("rejected payment plan shows the server errors and keeps the edits", async 
   expect(screen.getByText("Informe um valor entre R$ 0 e R$ 10.000.000.")).toBeInTheDocument();
   expect(screen.getAllByRole("article")).toHaveLength(2);
 });
+
+test("payment plan reports the excess when over 100%", async () => {
+  builderRoutes();
+  renderAt("/projetos/5/montagem");
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "3 parcelas" }));
+  within(screen.getAllByRole("article")[0]!).getByRole("slider").focus();
+  await user.keyboard("{ArrowRight}");
+  expect(screen.getByText("105% distribuído")).toBeInTheDocument();
+  expect(screen.getByText("5% acima do valor")).toBeInTheDocument();
+  expect(screen.queryByText(/Faltam/)).not.toBeInTheDocument();
+});
+
+test("editing rows clears the saved banner and any row can be removed", async () => {
+  builderRoutes((path, init) =>
+    path === "/api/projects/5/payments" && init?.method === "PUT" ? jsonResponse(204) : undefined,
+  );
+  renderAt("/projetos/5/montagem");
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "À vista" }));
+  await user.click(screen.getByRole("button", { name: "Salvar plano" }));
+  expect(await screen.findByText("Plano de pagamento salvo.")).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Adicionar pagamento" }));
+  expect(screen.queryByText("Plano de pagamento salvo.")).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Salvar plano" }));
+  expect(await screen.findByText("Plano de pagamento salvo.")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Remover Pagamento único" }));
+  expect(screen.queryByText("Plano de pagamento salvo.")).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Remover Parcela intermediária" }));
+  expect(screen.queryAllByRole("article")).toHaveLength(0);
+});
+
+test("Adicionar pagamento is disabled at 12 rows", async () => {
+  builderRoutes();
+  renderAt("/projetos/5/montagem");
+  const user = userEvent.setup();
+  await screen.findAllByRole("article");
+  const add = screen.getByRole("button", { name: "Adicionar pagamento" });
+  for (let i = 0; i < 10; i++) await user.click(add);
+  expect(screen.getAllByRole("article")).toHaveLength(12);
+  expect(add).toBeDisabled();
+});
+
+test("a malformed total blocks saving with a field error", async () => {
+  const fetchSpy = builderRoutes((path, init) =>
+    path === "/api/projects/5/payments" && init?.method === "PUT" ? jsonResponse(204) : undefined,
+  );
+  renderAt("/projetos/5/montagem");
+  const user = userEvent.setup();
+  const price = await screen.findByLabelText("Valor total do projeto (R$)");
+  await user.clear(price);
+  await user.type(price, "1,2,3");
+  await user.click(screen.getByRole("button", { name: "Salvar plano" }));
+  expect(await screen.findByText("Informe um valor válido.")).toBeInTheDocument();
+  expect(fetchSpy.mock.calls.some(([, init]) => init?.method === "PUT")).toBe(false);
+});
