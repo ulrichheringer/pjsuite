@@ -108,7 +108,7 @@ func (s *server) reviseContract(c *echo.Context, p project) error {
 		if err != nil {
 			return err
 		}
-		return recordEvent(ctx, tx, p.ID, event{Kind: eventRevisionCreated, Number: version.Number, Message: note})
+		return recordEvent(ctx, tx, p.ID, event{Kind: eventRevisionCreated, Private: p.Status == "final", Number: version.Number, Message: note})
 	})
 	if errors.Is(err, errRevisionClosed) {
 		return invalid(c, http.StatusConflict, fieldErrors{"status": "Este contrato não aceita nova versão."})

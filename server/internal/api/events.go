@@ -29,12 +29,16 @@ const (
 type event struct {
 	Kind    eventKind
 	Client  bool
+	Private bool
 	Name    string
 	Number  int
 	Message string
 }
 
 func (ev event) shared() bool {
+	if ev.Private {
+		return false
+	}
 	switch ev.Kind {
 	case eventProjectCreated, eventContractFinalized, eventArchived:
 		return false

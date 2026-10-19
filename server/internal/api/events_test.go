@@ -73,6 +73,17 @@ func TestEventsRecordContractAndClientActions(t *testing.T) {
 	}
 }
 
+func TestRevisionOfUnsharedFinalContractIsNotShared(t *testing.T) {
+	e, db := newServerDB(t)
+	a := signedUp(t, e)
+	path := filledProject(t, e, a)
+
+	send(e, http.MethodPost, path+"/contract", nil, a)
+	send(e, http.MethodPost, path+"/contract/revision", map[string]string{"note": "Ajuste interno"}, a)
+
+	assertEvents(t, db, path, "project_created/pro/false", "contract_finalized/pro/false", "revision_created/pro/false")
+}
+
 func TestEventsRecordSignatureAndArchive(t *testing.T) {
 	e, db := newServerDB(t)
 	a := signedUp(t, e)
