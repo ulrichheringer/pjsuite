@@ -21,6 +21,8 @@ import { Route as ProjetosIdRouteImport } from './routes/projetos.$id'
 import { Route as ProjetosNovoRouteImport } from './routes/projetos.novo'
 import { Route as ProjetosIdMontagemRouteImport } from './routes/projetos.$id_.montagem'
 import { Route as ProjetosIdVisibilidadeRouteImport } from './routes/projetos.$id_.visibilidade'
+import { Route as ProjetosIdContratoIndexRouteImport } from './routes/projetos.$id_.contrato.index'
+import { Route as ProjetosIdContratoVersionRouteImport } from './routes/projetos.$id_.contrato.$version'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -82,6 +84,17 @@ const ProjetosIdVisibilidadeRoute = ProjetosIdVisibilidadeRouteImport.update({
   path: '/projetos/$id/visibilidade',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProjetosIdContratoIndexRoute = ProjetosIdContratoIndexRouteImport.update({
+  id: '/projetos/$id_/contrato/',
+  path: '/projetos/$id/contrato/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjetosIdContratoVersionRoute =
+  ProjetosIdContratoVersionRouteImport.update({
+    id: '/projetos/$id_/contrato/$version',
+    path: '/projetos/$id/contrato/$version',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -96,6 +109,8 @@ export interface FileRoutesByFullPath {
   '/projetos/': typeof ProjetosIndexRoute
   '/projetos/$id/montagem': typeof ProjetosIdMontagemRoute
   '/projetos/$id/visibilidade': typeof ProjetosIdVisibilidadeRoute
+  '/projetos/$id/contrato/$version': typeof ProjetosIdContratoVersionRoute
+  '/projetos/$id/contrato/': typeof ProjetosIdContratoIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -110,6 +125,8 @@ export interface FileRoutesByTo {
   '/projetos': typeof ProjetosIndexRoute
   '/projetos/$id/montagem': typeof ProjetosIdMontagemRoute
   '/projetos/$id/visibilidade': typeof ProjetosIdVisibilidadeRoute
+  '/projetos/$id/contrato/$version': typeof ProjetosIdContratoVersionRoute
+  '/projetos/$id/contrato': typeof ProjetosIdContratoIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -125,6 +142,8 @@ export interface FileRoutesById {
   '/projetos/': typeof ProjetosIndexRoute
   '/projetos/$id_/montagem': typeof ProjetosIdMontagemRoute
   '/projetos/$id_/visibilidade': typeof ProjetosIdVisibilidadeRoute
+  '/projetos/$id_/contrato/$version': typeof ProjetosIdContratoVersionRoute
+  '/projetos/$id_/contrato/': typeof ProjetosIdContratoIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -141,6 +160,8 @@ export interface FileRouteTypes {
     | '/projetos/'
     | '/projetos/$id/montagem'
     | '/projetos/$id/visibilidade'
+    | '/projetos/$id/contrato/$version'
+    | '/projetos/$id/contrato/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -155,6 +176,8 @@ export interface FileRouteTypes {
     | '/projetos'
     | '/projetos/$id/montagem'
     | '/projetos/$id/visibilidade'
+    | '/projetos/$id/contrato/$version'
+    | '/projetos/$id/contrato'
   id:
     | '__root__'
     | '/'
@@ -169,6 +192,8 @@ export interface FileRouteTypes {
     | '/projetos/'
     | '/projetos/$id_/montagem'
     | '/projetos/$id_/visibilidade'
+    | '/projetos/$id_/contrato/$version'
+    | '/projetos/$id_/contrato/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -184,6 +209,8 @@ export interface RootRouteChildren {
   ProjetosIndexRoute: typeof ProjetosIndexRoute
   ProjetosIdMontagemRoute: typeof ProjetosIdMontagemRoute
   ProjetosIdVisibilidadeRoute: typeof ProjetosIdVisibilidadeRoute
+  ProjetosIdContratoVersionRoute: typeof ProjetosIdContratoVersionRoute
+  ProjetosIdContratoIndexRoute: typeof ProjetosIdContratoIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -272,6 +299,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjetosIdVisibilidadeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/projetos/$id_/contrato/': {
+      id: '/projetos/$id_/contrato/'
+      path: '/projetos/$id/contrato'
+      fullPath: '/projetos/$id/contrato/'
+      preLoaderRoute: typeof ProjetosIdContratoIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projetos/$id_/contrato/$version': {
+      id: '/projetos/$id_/contrato/$version'
+      path: '/projetos/$id/contrato/$version'
+      fullPath: '/projetos/$id/contrato/$version'
+      preLoaderRoute: typeof ProjetosIdContratoVersionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -288,6 +329,8 @@ const rootRouteChildren: RootRouteChildren = {
   ProjetosIndexRoute: ProjetosIndexRoute,
   ProjetosIdMontagemRoute: ProjetosIdMontagemRoute,
   ProjetosIdVisibilidadeRoute: ProjetosIdVisibilidadeRoute,
+  ProjetosIdContratoVersionRoute: ProjetosIdContratoVersionRoute,
+  ProjetosIdContratoIndexRoute: ProjetosIdContratoIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

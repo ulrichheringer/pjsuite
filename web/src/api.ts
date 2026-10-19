@@ -125,7 +125,7 @@ const projectSchema = z.object({
   reference: z.string(),
   goal: z.string(),
   structure: z.enum(["blank", "essential", "suggested"]),
-  status: z.literal("draft"),
+  status: z.enum(["draft", "final"]),
   archived: z.boolean(),
   scope: z.string(),
   outcome: z.string(),
@@ -343,4 +343,26 @@ export type ClientView = z.infer<typeof clientViewSchema>;
 export const getClientView = (projectId: string) =>
   call(`/api/projects/${encodeURIComponent(projectId)}/client-view`, {}, async (res) =>
     clientViewSchema.parse(await res.json()),
+  );
+
+const contractSchema = z.object({
+  number: z.number(),
+  hash: z.string(),
+  createdAt: z.string(),
+  content: clientViewSchema,
+});
+
+export type Contract = z.infer<typeof contractSchema>;
+
+const contractPath = (projectId: string) =>
+  `/api/projects/${encodeURIComponent(projectId)}/contract`;
+
+export const finalizeContract = (projectId: string) =>
+  call(contractPath(projectId), { method: "POST" }, async (res) =>
+    contractSchema.parse(await res.json()),
+  );
+
+export const getContract = (projectId: string, number: number) =>
+  call(`${contractPath(projectId)}/${number}`, {}, async (res) =>
+    contractSchema.parse(await res.json()),
   );

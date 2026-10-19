@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Eye } from "lucide-react";
+import { ArrowRight, Eye } from "lucide-react";
 import {
   getClientView,
   getProject,
@@ -15,7 +15,7 @@ import {
 } from "@/api";
 import { ClientPreview } from "@/client-preview";
 import { Switch } from "@/components/ui/switch";
-import { Badge, Banner, Loading } from "@/ui";
+import { Badge, Banner, Button, Loading } from "@/ui";
 
 export const Route = createFileRoute("/projetos/$id_/visibilidade")({ component: VisibilityPage });
 
@@ -83,7 +83,7 @@ function VisibilityPage() {
             <h1>O cliente vê o que faz sentido.</h1>
             <p>Ligue ou desligue os blocos e confira a prévia ao lado.</p>
           </div>
-          <Badge>Rascunho</Badge>
+          <Badge>{project.status === "final" ? "Finalizado" : "Rascunho"}</Badge>
         </header>
         <div className="stepper">
           {steps.map((step, i) =>
@@ -93,6 +93,10 @@ function VisibilityPage() {
               </Link>
             ) : i === 1 ? (
               <strong key={step}>{step}</strong>
+            ) : i === 2 ? (
+              <Link key={step} to="/projetos/$id/contrato" params={{ id }}>
+                {step}
+              </Link>
             ) : (
               <span key={step}>{step}</span>
             ),
@@ -117,6 +121,12 @@ function VisibilityPage() {
                 />
               </div>
             ))}
+            <Button className="full" asChild>
+              <Link to="/projetos/$id/contrato" params={{ id }}>
+                Conferir contrato
+                <ArrowRight />
+              </Link>
+            </Button>
           </section>
           <div className="client-preview">
             <div className="preview-label">
