@@ -197,7 +197,7 @@ function BuilderPage() {
             <h1>Montagem do projeto</h1>
             <p>Monte uma estrutura que acompanha o seu jeito de trabalhar.</p>
           </div>
-          <Badge>Rascunho</Badge>
+          <Badge>{project.status === "final" ? "Finalizado" : "Rascunho"}</Badge>
         </header>
         <div className="stepper">
           {steps.map((step, i) =>
@@ -205,6 +205,10 @@ function BuilderPage() {
               <strong key={step}>{step}</strong>
             ) : i === 1 ? (
               <Link key={step} to="/projetos/$id/visibilidade" params={{ id }}>
+                {step}
+              </Link>
+            ) : i === 2 ? (
+              <Link key={step} to="/projetos/$id/contrato" params={{ id }}>
                 {step}
               </Link>
             ) : (
