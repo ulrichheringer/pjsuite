@@ -391,3 +391,24 @@ func TestSignContractListShowsVersionsAndSignature(t *testing.T) {
 		t.Errorf("other user = %d", rec.Code)
 	}
 }
+
+func TestSignRejectsArchivingSignedProject(t *testing.T) {
+	e := newServer(t)
+	a := signedUp(t, e)
+	path, _ := signedProject(t, e, a)
+
+	if rec := send(e, http.MethodPost, path+"/archive", nil, a); rec.Code != http.StatusConflict {
+		t.Fatalf("archive signed = %d", rec.Code)
+	}
+}
+
+func TestSignDBRejectsNewVersionAfterSignature(t *testing.T) {
+	e, db := newServerDB(t)
+	a := signedUp(t, e)
+	signedProject(t, e, a)
+
+	if _, err := db.ExecContext(t.Context(),
+		`INSERT INTO contract_versions (project_id, number, content, hash) SELECT project_id, 2, content, hash FROM contract_versions`); err == nil {
+		t.Error("version insert after signature succeeded")
+	}
+}

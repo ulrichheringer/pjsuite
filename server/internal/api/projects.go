@@ -191,6 +191,9 @@ func (s *server) archiveProject(c *echo.Context) error {
 	if err != nil {
 		return err
 	}
+	if p.Status == "signed" {
+		return invalid(c, http.StatusConflict, fieldErrors{"signed": "Contrato assinado não pode ser arquivado."})
+	}
 	if _, err := s.db.ExecContext(c.Request().Context(),
 		`UPDATE projects SET archived_at = COALESCE(archived_at, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) WHERE id = ?`, p.ID); err != nil {
 		return err
