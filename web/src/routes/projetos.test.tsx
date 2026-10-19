@@ -16,6 +16,9 @@ const project = (id: number, name: string, clientName: string, extra = {}) => ({
   structure: "essential",
   status: "draft",
   archived: false,
+  scope: "",
+  outcome: "",
+  notes: "",
   ...extra,
 });
 

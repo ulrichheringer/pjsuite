@@ -127,6 +127,9 @@ const projectSchema = z.object({
   structure: z.enum(["blank", "essential", "suggested"]),
   status: z.literal("draft"),
   archived: z.boolean(),
+  scope: z.string(),
+  outcome: z.string(),
+  notes: z.string(),
 });
 
 export type Project = z.infer<typeof projectSchema>;
@@ -159,3 +162,37 @@ export const duplicateProject = (id: number, input: { name: string; clientId: nu
 
 export const archiveProject = (id: number) =>
   call(`/api/projects/${id}/archive`, { method: "POST" }, none);
+
+export const timingKindLabels = {
+  deadline: "Data limite",
+  date: "Data específica",
+  period: "Período",
+  relative: "Duração relativa",
+  milestone: "Marco sem data",
+  none: "Sem prazo",
+} as const;
+
+export type TimingKind = keyof typeof timingKindLabels;
+
+const stageSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  timingKind: z.enum(["deadline", "date", "period", "relative", "milestone", "none"]),
+  timing: z.string(),
+  deliverable: z.string(),
+  visible: z.boolean(),
+  tasks: z.array(z.object({ id: z.number(), title: z.string() })),
+});
+
+export type Stage = z.infer<typeof stageSchema>;
+export type StageInput = Omit<Stage, "id" | "tasks"> & { tasks: string[] };
+
+export const listStages = (projectId: string) =>
+  call(`/api/projects/${encodeURIComponent(projectId)}/stages`, {}, async (res) =>
+    z.array(stageSchema).parse(await res.json()),
+  );
+
+export type BuilderInput = Pick<Project, "scope" | "outcome" | "notes">;
+
+export const saveBuilder = (projectId: string, input: BuilderInput) =>
+  call(`/api/projects/${encodeURIComponent(projectId)}/builder`, json("PUT", input), none);
