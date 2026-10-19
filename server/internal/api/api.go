@@ -66,5 +66,6 @@ func New(db *sql.DB, files storage.Store) *echo.Echo {
 	g.DELETE("/projects/:id/attachments/:aid", s.writableProject(s.deleteAttachment), s.requireAuth)
 	g.GET("/projects/:id/visibility", s.getVisibility, s.requireAuth)
 	g.PUT("/projects/:id/visibility", s.writableProject(s.putVisibility), s.requireAuth, bodyLimit)
+	g.GET("/projects/:id/client-view", s.getClientView, s.requireAuth)
 	return e
 }
