@@ -51,7 +51,7 @@ function ContractPdfPage() {
               {contract.content.client.name}
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="row-between">
             <Button variant="outline" onClick={() => window.print()}>
               <Download />
               Imprimir / salvar PDF

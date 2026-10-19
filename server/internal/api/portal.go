@@ -89,23 +89,26 @@ func (s *server) postRefuse(c *echo.Context) error {
 func (s *server) recordRequest(c *echo.Context, kind, status, message string) error {
 	err := s.inTx(c, func(ctx context.Context, tx *sql.Tx) error {
 		var projectID int64
-		var current string
 		err := tx.QueryRowContext(ctx,
-			`SELECT p.id, p.status FROM share_links l JOIN projects p ON p.id = l.project_id WHERE l.token = ? AND p.archived_at IS NULL`,
-			c.Param("token")).Scan(&projectID, &current)
+			`SELECT p.id FROM share_links l JOIN projects p ON p.id = l.project_id WHERE l.token = ? AND p.archived_at IS NULL`,
+			c.Param("token")).Scan(&projectID)
 		if err != nil {
 			return err
 		}
-		if current == "refused" {
-			return errRefused
-		}
-		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO client_requests (project_id, version, kind, message)
-			VALUES (?, (SELECT MAX(number) FROM contract_versions WHERE project_id = ?), ?, ?)`,
-			projectID, projectID, kind, message); err != nil {
+		res, err := tx.ExecContext(ctx,
+			`UPDATE projects SET status = ? WHERE id = ? AND status <> 'refused'`, status, projectID)
+		if err != nil {
 			return err
 		}
-		_, err = tx.ExecContext(ctx, `UPDATE projects SET status = ? WHERE id = ?`, status, projectID)
+		if n, err := res.RowsAffected(); err != nil {
+			return err
+		} else if n == 0 {
+			return errRefused
+		}
+		_, err = tx.ExecContext(ctx,
+			`INSERT INTO client_requests (project_id, version, kind, message)
+			VALUES (?, (SELECT MAX(number) FROM contract_versions WHERE project_id = ?), ?, ?)`,
+			projectID, projectID, kind, message)
 		return err
 	})
 	if errors.Is(err, sql.ErrNoRows) {

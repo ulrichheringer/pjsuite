@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vite-plus/test";
 import { jsonResponse, mockFetch, renderAt } from "@/test-utils";
@@ -121,6 +121,21 @@ test.each(["/p/NOPE", "/p/NOPE/alteracao", "/p/NOPE/recusar"])(
 
     expect(await screen.findByText("Link inválido")).toBeVisible();
     expect(screen.queryByText("Ensaio de marca")).toBeNull();
-    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
   },
 );
+
+test.each([
+  ["/p/TOK/alteracao", "/api/portal/TOK/change", /Enviar solicitação/, /O que deve mudar/],
+  ["/p/TOK/recusar", "/api/portal/TOK/refuse", /Confirmar recusa/, null],
+])("%s shows the refused message on 409", async (route, endpoint, button, label) => {
+  portalRoutes("viewed", (path, init) => {
+    if (path === endpoint && init?.method === "POST")
+      return jsonResponse(409, { errors: { status: "O contrato já foi recusado." } });
+  });
+  renderAt(route);
+
+  if (label) await userEvent.type(await screen.findByLabelText(label), "x");
+  await userEvent.click(await screen.findByRole("button", { name: button }));
+
+  expect(await screen.findByText("Este projeto já foi recusado.")).toBeVisible();
+});

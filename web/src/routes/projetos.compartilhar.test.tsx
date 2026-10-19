@@ -85,7 +85,7 @@ test("a viewed link shows Visto and the latest client request", async () => {
   renderAt("/projetos/5/compartilhar");
 
   expect(await screen.findByText("Alteração solicitada")).toBeVisible();
-  expect(screen.getByText(/Visto pelo cliente/)).toBeVisible();
+  expect(screen.getByRole("listitem")).toHaveTextContent("Visto pelo cliente");
   expect(screen.getByText("Trocar prazo")).toBeVisible();
 });
 
@@ -114,4 +114,17 @@ test("a draft project asks to finalize the contract first", async () => {
 
   expect(await screen.findByText("Finalize o contrato antes de compartilhar.")).toBeVisible();
   expect(screen.queryByRole("button", { name: /Gerar link/ })).toBeNull();
+});
+
+test("a failed clipboard write shows an error instead of copied", async () => {
+  shareRoutes("sent", () => jsonResponse(200, link));
+  const user = userEvent.setup();
+  renderAt("/projetos/5/compartilhar");
+  await screen.findByLabelText("Link de revisão");
+  vi.spyOn(navigator.clipboard, "writeText").mockRejectedValue(new Error("denied"));
+
+  await user.click(screen.getByRole("button", { name: /Copiar link/ }));
+
+  expect(await screen.findByText("Não foi possível copiar o link.")).toBeVisible();
+  expect(screen.queryByText("Link copiado.")).toBeNull();
 });

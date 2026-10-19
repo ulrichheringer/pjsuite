@@ -12,7 +12,7 @@ import {
   type Share,
 } from "@/api";
 import { Stepper } from "@/stepper";
-import { Badge, Banner, Button, Field, Loading } from "@/ui";
+import { Badge, Banner, Button, Field, Loading, Timeline } from "@/ui";
 
 export const Route = createFileRoute("/projetos/$id_/compartilhar")({ component: SharePage });
 
@@ -25,7 +25,7 @@ function SharePage() {
   const [share, setShare] = useState<Share | null>();
   const [loadFailed, setLoadFailed] = useState(false);
   const [problem, setProblem] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"idle" | "done" | "failed">("idle");
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
@@ -67,13 +67,17 @@ function SharePage() {
     setPending(false);
     if (outcome.kind === "unauthorized") return navigate({ to: "/entrar" });
     if (outcome.kind !== "ok") return setProblem(true);
-    setCopied(false);
+    setCopied("idle");
     setShare(outcome.value);
   }
 
   async function copy(url: string) {
-    await navigator.clipboard.writeText(url);
-    setCopied(true);
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied("done");
+    } catch {
+      setCopied("failed");
+    }
   }
 
   const url = share ? `${window.location.origin}${share.url}` : "";
@@ -112,12 +116,21 @@ function SharePage() {
               <RefreshCw />
               Gerar novo link
             </Button>
-            {copied && <Banner title="Link copiado." tone="success" />}
+            {copied === "done" && <Banner title="Link copiado." tone="success" />}
+            {copied === "failed" && (
+              <Banner title="Não foi possível copiar o link." tone="danger">
+                Copie o link do campo acima.
+              </Banner>
+            )}
             <p className="small">
               Envie o link pelo seu canal. O link antigo deixa de funcionar ao gerar um novo.
             </p>
             {share.viewedAt && (
-              <p>Visto pelo cliente em {new Date(share.viewedAt).toLocaleString("pt-BR")}.</p>
+              <Timeline
+                events={[
+                  `Visto pelo cliente · ${new Date(share.viewedAt).toLocaleString("pt-BR")}`,
+                ]}
+              />
             )}
             {share.request && (
               <Banner title={requestTitles[share.request.kind]} tone="warning">

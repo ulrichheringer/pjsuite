@@ -10,20 +10,24 @@ function RefusePage() {
   const { token } = Route.useParams();
   const [reason, setReason] = useState("");
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<"none" | "error" | "refused">("none");
   const [pending, setPending] = useState(false);
   const [done, setDone] = useState(false);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setPending(true);
-    setFailed(false);
+    setFailed("none");
     const outcome = await refuseProject(token, reason);
     setPending(false);
     if (outcome.kind === "ok") return setDone(true);
-    if (outcome.kind === "invalid") return setErrors(outcome.errors);
+    if (outcome.kind === "invalid" && outcome.status !== 409) return setErrors(outcome.errors);
     setErrors({});
-    setFailed(true);
+    setFailed(
+      (outcome.kind === "invalid" || outcome.kind === "failed") && outcome.status === 409
+        ? "refused"
+        : "error",
+    );
   }
 
   return (
@@ -37,11 +41,12 @@ function RefusePage() {
           <form className="surface" onSubmit={submit}>
             <h1>Recusar projeto</h1>
             <p>{portal.content.project}</p>
-            {failed && (
+            {failed === "error" && (
               <Banner title="Não foi possível registrar a recusa." tone="danger">
                 Tente novamente em instantes.
               </Banner>
             )}
+            {failed === "refused" && <Banner title="Este projeto já foi recusado." tone="danger" />}
             <Field
               label="Motivo (opcional)"
               area
