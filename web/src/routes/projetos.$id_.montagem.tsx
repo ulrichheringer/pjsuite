@@ -1,16 +1,23 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { EyeOff } from "lucide-react";
+import { ChevronDown, ChevronUp, EyeOff, Pencil, Plus } from "lucide-react";
 import {
+  createStage,
+  deleteStage,
   getProject,
   listStages,
+  reorderStages,
   saveBuilder,
   timingKindLabels,
+  updateStage,
   type BuilderInput,
   type FieldErrors,
+  type Outcome,
   type Project,
   type Stage,
+  type StageInput,
 } from "@/api";
+import { StageDialog } from "@/stage-dialog";
 import { Badge, Banner, Button, Field, Loading } from "@/ui";
 
 export const Route = createFileRoute("/projetos/$id_/montagem")({ component: BuilderPage });
@@ -28,9 +35,23 @@ function Section({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
-
-function StageRow({ stage, number }: { stage: Stage; number: number }) {
+function StageRow({
+  stage,
+  number,
+  first,
+  last,
+  readOnly,
+  onEdit,
+  onMove,
+}: {
+  stage: Stage;
+  number: number;
+  first: boolean;
+  last: boolean;
+  readOnly: boolean;
+  onEdit: () => void;
+  onMove: (direction: -1 | 1) => void;
+}) {
   const timing =
     stage.timingKind === "none"
       ? timingKindLabels.none
@@ -49,10 +70,35 @@ function StageRow({ stage, number }: { stage: Stage; number: number }) {
         </div>
         <small>{timing}</small>
         <p>
-          {plural(stage.tasks.length, "tarefa", "tarefas")}
+          {stage.tasks.length} {stage.tasks.length === 1 ? "tarefa" : "tarefas"}
           {stage.deliverable ? ` · ${stage.deliverable}` : " · sem entregável"}
         </p>
       </div>
+      {!readOnly && (
+        <>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={`Mover ${stage.name} para cima`}
+            disabled={first}
+            onClick={() => onMove(-1)}
+          >
+            <ChevronUp size={16} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={`Mover ${stage.name} para baixo`}
+            disabled={last}
+            onClick={() => onMove(1)}
+          >
+            <ChevronDown size={16} />
+          </Button>
+          <Button variant="ghost" size="icon" aria-label={`Editar ${stage.name}`} onClick={onEdit}>
+            <Pencil size={16} />
+          </Button>
+        </>
+      )}
     </div>
   );
 }
@@ -65,9 +111,12 @@ function BuilderPage() {
   const [text, setText] = useState<BuilderInput>({ scope: "", outcome: "", notes: "" });
   const [errors, setErrors] = useState<FieldErrors>({});
   const [loadFailed, setLoadFailed] = useState(false);
-  const [saveFailed, setSaveFailed] = useState(false);
+  const [problem, setProblem] = useState<string>();
   const [saved, setSaved] = useState(false);
   const [pending, setPending] = useState(false);
+  const [dialog, setDialog] = useState<{ stage?: Stage }>();
+  const [dialogErrors, setDialogErrors] = useState<FieldErrors>({});
+  const [dialogProblem, setDialogProblem] = useState<string>();
 
   useEffect(() => {
     Promise.all([getProject(id), listStages(id)]).then(([current, list]) => {
@@ -98,14 +147,49 @@ function BuilderPage() {
     );
   }
 
+  async function refreshStages() {
+    const list = await listStages(id);
+    if (list.kind === "unauthorized") return navigate({ to: "/entrar" });
+    if (list.kind !== "ok") return setProblem("Não foi possível atualizar as etapas.");
+    setStages(list.value);
+  }
+
   async function save() {
     setPending(true);
     const outcome = await saveBuilder(id, text);
     setPending(false);
     if (outcome.kind === "unauthorized") return navigate({ to: "/entrar" });
     setErrors(outcome.kind === "invalid" ? outcome.errors : {});
-    setSaveFailed(outcome.kind !== "ok");
+    setProblem(outcome.kind === "ok" ? undefined : "Não foi possível salvar a montagem.");
     setSaved(outcome.kind === "ok");
+  }
+
+  async function changeStage(request: Promise<Outcome>, failure: string) {
+    setPending(true);
+    const outcome = await request;
+    setPending(false);
+    if (outcome.kind === "unauthorized") return navigate({ to: "/entrar" });
+    setDialogErrors(outcome.kind === "invalid" ? outcome.errors : {});
+    if (outcome.kind !== "ok")
+      return setDialogProblem(outcome.kind === "failed" ? failure : undefined);
+    setDialog(undefined);
+    await refreshStages();
+  }
+
+  async function move(index: number, direction: -1 | 1) {
+    const ids = stages.map((stage) => stage.id);
+    [ids[index], ids[index + direction]] = [ids[index + direction]!, ids[index]!];
+    const outcome = await reorderStages(id, ids);
+    if (outcome.kind === "unauthorized") return navigate({ to: "/entrar" });
+    if (outcome.kind !== "ok") return setProblem("Não foi possível reordenar as etapas.");
+    setProblem(undefined);
+    await refreshStages();
+  }
+
+  function openDialog(stage?: Stage) {
+    setDialogErrors({});
+    setDialogProblem(undefined);
+    setDialog({ stage });
   }
 
   const change = (patch: Partial<BuilderInput>) => {
@@ -129,8 +213,8 @@ function BuilderPage() {
             i === 0 ? <strong key={step}>{step}</strong> : <span key={step}>{step}</span>,
           )}
         </div>
-        {saveFailed && (
-          <Banner title="Não foi possível salvar a montagem." tone="danger">
+        {problem && (
+          <Banner title={problem} tone="danger">
             Seus dados foram mantidos. Confira os campos e tente novamente.
           </Banner>
         )}
@@ -154,9 +238,27 @@ function BuilderPage() {
               </p>
               <div className="phase-list">
                 {stages.map((stage, i) => (
-                  <StageRow key={stage.id} stage={stage} number={i + 1} />
+                  <StageRow
+                    key={stage.id}
+                    stage={stage}
+                    number={i + 1}
+                    first={i === 0}
+                    last={i === stages.length - 1}
+                    readOnly={project.archived}
+                    onEdit={() => openDialog(stage)}
+                    onMove={(direction) => move(i, direction)}
+                  />
                 ))}
               </div>
+              {!project.archived && (
+                <button className="add-phase-row" type="button" onClick={() => openDialog()}>
+                  <Plus size={18} />
+                  <span>
+                    <strong>Adicionar nova etapa</strong>
+                    <small>Defina tarefas, prazo, entregável e visibilidade.</small>
+                  </span>
+                </button>
+              )}
             </Section>
             <Section label="03 / Resultado final">
               <Field
@@ -205,6 +307,26 @@ function BuilderPage() {
             )}
           </aside>
         </div>
+        {dialog && (
+          <StageDialog
+            key={dialog.stage?.id ?? "new"}
+            stage={dialog.stage}
+            errors={dialogErrors}
+            problem={dialogProblem}
+            pending={pending}
+            onClose={() => setDialog(undefined)}
+            onSave={(input: StageInput) =>
+              changeStage(
+                dialog.stage ? updateStage(id, dialog.stage.id, input) : createStage(id, input),
+                "Não foi possível salvar a etapa.",
+              )
+            }
+            onRemove={() =>
+              dialog.stage &&
+              changeStage(deleteStage(id, dialog.stage.id), "Não foi possível remover a etapa.")
+            }
+          />
+        )}
       </main>
     </div>
   );

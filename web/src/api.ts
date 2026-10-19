@@ -196,3 +196,17 @@ export type BuilderInput = Pick<Project, "scope" | "outcome" | "notes">;
 
 export const saveBuilder = (projectId: string, input: BuilderInput) =>
   call(`/api/projects/${encodeURIComponent(projectId)}/builder`, json("PUT", input), none);
+
+const stagePath = (projectId: string) => `/api/projects/${encodeURIComponent(projectId)}/stages`;
+
+export const createStage = (projectId: string, input: StageInput) =>
+  call(stagePath(projectId), json("POST", input), none);
+
+export const updateStage = (projectId: string, stageId: number, input: StageInput) =>
+  call(`${stagePath(projectId)}/${stageId}`, json("PUT", input), none);
+
+export const deleteStage = (projectId: string, stageId: number) =>
+  call(`${stagePath(projectId)}/${stageId}`, { method: "DELETE" }, none);
+
+export const reorderStages = (projectId: string, ids: number[]) =>
+  call(`${stagePath(projectId)}/order`, json("PUT", { ids }), none);
