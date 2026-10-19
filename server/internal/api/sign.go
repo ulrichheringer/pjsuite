@@ -93,7 +93,10 @@ func (s *server) postSign(c *echo.Context) error {
 			SELECT project_id, number, ?, ?, ?, ?, hash FROM contract_versions WHERE project_id = ? AND number = ?
 			RETURNING name, email, version, hash, signed_at`,
 			in.Name, in.Email, c.RealIP(), c.Request().UserAgent(), projectID, latest).Scan(&r.Name, &r.Email, &r.Version, &r.Hash, &r.SignedAt)
-		return err
+		if err != nil {
+			return err
+		}
+		return recordEvent(ctx, tx, projectID, event{Kind: eventSigned, Client: true, Name: r.Name, Number: r.Version})
 	})
 	if errors.Is(err, sql.ErrNoRows) {
 		return linkInvalid(c)

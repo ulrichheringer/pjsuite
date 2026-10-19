@@ -54,6 +54,7 @@ func (s *server) getPortal(c *echo.Context) error {
 	var projectID int64
 	var view portalView
 	var content string
+	var firstView bool
 	err := s.inTx(c, func(ctx context.Context, tx *sql.Tx) error {
 		err := tx.QueryRowContext(ctx,
 			`SELECT l.project_id FROM share_links l JOIN projects p ON p.id = l.project_id WHERE l.token = ? AND p.archived_at IS NULL`,
@@ -61,10 +62,16 @@ func (s *server) getPortal(c *echo.Context) error {
 		if err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx,
-			`UPDATE share_links SET viewed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE project_id = ? AND viewed_at IS NULL`, projectID); err != nil {
+		res, err := tx.ExecContext(ctx,
+			`UPDATE share_links SET viewed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE project_id = ? AND viewed_at IS NULL`, projectID)
+		if err != nil {
 			return err
 		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return err
+		}
+		firstView = n > 0
 		if _, err := tx.ExecContext(ctx, `UPDATE projects SET status = 'viewed' WHERE id = ? AND status = 'sent'`, projectID); err != nil {
 			return err
 		}
@@ -74,8 +81,10 @@ func (s *server) getPortal(c *echo.Context) error {
 		if err != nil {
 			return err
 		}
-		view.Signature, err = loadReceipt(ctx, tx, projectID)
-		return err
+		if view.Signature, err = loadReceipt(ctx, tx, projectID); err != nil || !firstView {
+			return err
+		}
+		return recordEvent(ctx, tx, projectID, event{Kind: eventClientViewed, Client: true, Number: view.Version})
 	})
 	if errors.Is(err, sql.ErrNoRows) {
 		return linkInvalid(c)
@@ -161,11 +170,19 @@ func (s *server) recordRequest(c *echo.Context, kind, status, message string) er
 		} else if n == 0 {
 			return errRequestClosed
 		}
-		_, err = tx.ExecContext(ctx,
+		var version int
+		err = tx.QueryRowContext(ctx,
 			`INSERT INTO client_requests (project_id, version, kind, message)
-			VALUES (?, (SELECT MAX(number) FROM contract_versions WHERE project_id = ?), ?, ?)`,
-			projectID, projectID, kind, message)
-		return err
+			VALUES (?, (SELECT MAX(number) FROM contract_versions WHERE project_id = ?), ?, ?) RETURNING version`,
+			projectID, projectID, kind, message).Scan(&version)
+		if err != nil {
+			return err
+		}
+		evKind := eventRefused
+		if kind == "change" {
+			evKind = eventChangeRequested
+		}
+		return recordEvent(ctx, tx, projectID, event{Kind: evKind, Client: true, Number: version, Message: message})
 	})
 	if errors.Is(err, sql.ErrNoRows) {
 		return linkInvalid(c)

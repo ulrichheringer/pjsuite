@@ -74,18 +74,24 @@ func (s *server) writeShare(c *echo.Context, p project, onConflict string) error
 		return err
 	}
 	err = s.inTx(c, func(ctx context.Context, tx *sql.Tx) error {
-		var hasContract bool
-		if err := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM contract_versions WHERE project_id = ?)`, p.ID).Scan(&hasContract); err != nil {
+		var latest int
+		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(number), 0) FROM contract_versions WHERE project_id = ?`, p.ID).Scan(&latest); err != nil {
 			return err
 		}
-		if !hasContract {
+		if latest == 0 {
 			return errNoContract
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO share_links (project_id, token) VALUES (?, ?) ON CONFLICT (project_id) `+onConflict, p.ID, token); err != nil {
+		res, err := tx.ExecContext(ctx, `INSERT INTO share_links (project_id, token) VALUES (?, ?) ON CONFLICT (project_id) `+onConflict, p.ID, token)
+		if err != nil {
 			return err
 		}
-		_, err := tx.ExecContext(ctx, `UPDATE projects SET status = 'sent' WHERE id = ? AND status = 'final'`, p.ID)
-		return err
+		if _, err := tx.ExecContext(ctx, `UPDATE projects SET status = 'sent' WHERE id = ? AND status = 'final'`, p.ID); err != nil {
+			return err
+		}
+		if n, err := res.RowsAffected(); err != nil || n == 0 {
+			return err
+		}
+		return recordEvent(ctx, tx, p.ID, event{Kind: eventVersionShared, Number: latest})
 	})
 	if errors.Is(err, errNoContract) {
 		return invalid(c, http.StatusConflict, fieldErrors{"contract": "Finalize o contrato antes de compartilhar."})
