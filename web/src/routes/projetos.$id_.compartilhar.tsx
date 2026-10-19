@@ -135,7 +135,7 @@ function SharePage() {
             {share.viewedAt && (
               <Timeline
                 events={[
-                  `Visto pelo cliente · ${new Date(share.viewedAt).toLocaleString("pt-BR")}`,
+                  { title: "Visto pelo cliente", author: project.clientName, at: share.viewedAt },
                 ]}
               />
             )}
@@ -151,6 +151,9 @@ function SharePage() {
                 </Link>
               </Button>
             )}
+            <Link to="/projetos/$id/historico" params={{ id }}>
+              Ver histórico do projeto
+            </Link>
           </section>
         ) : (
           <Button disabled={pending} onClick={() => generate(createShare)}>
