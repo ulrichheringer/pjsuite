@@ -6,6 +6,7 @@ import {
   duplicateProject,
   listClients,
   listProjects,
+  projectStatusLabels,
   type Client,
   type FieldErrors,
   type Project,
@@ -169,7 +170,7 @@ function ProjectsPage() {
                       <ArrowUpRight className="project-arrow" />
                     </Link>
                     <p>{p.clientName}</p>
-                    <Badge>{p.status === "final" ? "Finalizado" : "Rascunho"}</Badge>
+                    <Badge>{projectStatusLabels[p.status]}</Badge>
                     {p.reference && (
                       <footer>
                         <span>{p.reference}</span>

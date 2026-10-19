@@ -125,7 +125,7 @@ const projectSchema = z.object({
   reference: z.string(),
   goal: z.string(),
   structure: z.enum(["blank", "essential", "suggested"]),
-  status: z.enum(["draft", "final"]),
+  status: z.enum(["draft", "final", "sent", "viewed", "changes_requested", "refused"]),
   archived: z.boolean(),
   scope: z.string(),
   outcome: z.string(),
@@ -133,6 +133,15 @@ const projectSchema = z.object({
 });
 
 export type Project = z.infer<typeof projectSchema>;
+
+export const projectStatusLabels: Record<Project["status"], string> = {
+  draft: "Rascunho",
+  final: "Finalizado",
+  sent: "Enviado",
+  viewed: "Visto",
+  changes_requested: "Alteração solicitada",
+  refused: "Recusado",
+};
 
 export const listProjects = (archived = false) =>
   call(`/api/projects${archived ? "?archived=1" : ""}`, {}, async (res) =>
@@ -367,4 +376,35 @@ export const finalizeContract = (projectId: string) =>
 export const getContract = (projectId: string, number: number) =>
   call(`${contractPath(projectId)}/${number}`, {}, async (res) =>
     contractSchema.parse(await res.json()),
+  );
+
+const shareSchema = z.object({
+  token: z.string(),
+  url: z.string(),
+  viewedAt: z.string().nullable(),
+  request: z
+    .object({
+      kind: z.enum(["change", "refuse"]),
+      message: z.string(),
+      version: z.number(),
+      createdAt: z.string(),
+    })
+    .nullable(),
+});
+
+export type Share = z.infer<typeof shareSchema>;
+
+const sharePath = (projectId: string) => `/api/projects/${encodeURIComponent(projectId)}/share`;
+
+export const getShare = (projectId: string) =>
+  call(sharePath(projectId), {}, async (res) => shareSchema.parse(await res.json()));
+
+export const createShare = (projectId: string) =>
+  call(sharePath(projectId), { method: "POST" }, async (res) =>
+    shareSchema.parse(await res.json()),
+  );
+
+export const regenerateShare = (projectId: string) =>
+  call(`${sharePath(projectId)}/regenerate`, { method: "POST" }, async (res) =>
+    shareSchema.parse(await res.json()),
   );
