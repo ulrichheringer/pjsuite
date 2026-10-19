@@ -13,6 +13,8 @@ import (
 	"github.com/labstack/echo/v5"
 )
 
+var errContractFinalized = errors.New("contract already finalized")
+
 type contractVersion struct {
 	Number    int             `json:"number"`
 	Hash      string          `json:"hash"`
@@ -37,7 +39,7 @@ func (s *server) finalizeContract(c *echo.Context, p project) error {
 			return err
 		}
 		if exists {
-			return invalid(c, http.StatusConflict, fieldErrors{"contract": "O contrato já foi finalizado."})
+			return errContractFinalized
 		}
 		err := tx.QueryRowContext(ctx,
 			`INSERT INTO contract_versions (project_id, number, content, hash) VALUES (?, ?, ?, ?) RETURNING created_at`,
@@ -48,6 +50,9 @@ func (s *server) finalizeContract(c *echo.Context, p project) error {
 		_, err = tx.ExecContext(ctx, `UPDATE projects SET status = 'final' WHERE id = ?`, p.ID)
 		return err
 	})
+	if errors.Is(err, errContractFinalized) {
+		return invalid(c, http.StatusConflict, fieldErrors{"contract": "O contrato já foi finalizado."})
+	}
 	if err != nil {
 		return err
 	}

@@ -45,8 +45,19 @@ func TestContractFinalizeCreatesV1AndMarksProjectFinal(t *testing.T) {
 		t.Fatalf("status = %v", got["status"])
 	}
 
-	if rec := send(e, http.MethodPost, path+"/contract", nil, a); rec.Code != http.StatusConflict {
-		t.Fatalf("second POST = %d", rec.Code)
+	second := send(e, http.MethodPost, path+"/contract", nil, a)
+	if second.Code != http.StatusConflict {
+		t.Fatalf("second POST = %d", second.Code)
+	}
+	var conflict struct {
+		Errors map[string]string `json:"errors"`
+	}
+	decode(t, second, &conflict)
+	if conflict.Errors["contract"] == "" {
+		t.Fatalf("second POST body = %s", second.Body)
+	}
+	if rec := get(e, path+"/contract/2", a); rec.Code != http.StatusNotFound {
+		t.Fatalf("second version = %d", rec.Code)
 	}
 }
 
