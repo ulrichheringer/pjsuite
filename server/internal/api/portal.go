@@ -21,12 +21,27 @@ type portalProgress struct {
 	Status string `json:"status"`
 }
 
+type portalFile struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+	Size int64  `json:"size"`
+}
+
+type portalDelivery struct {
+	Number      int          `json:"number"`
+	Title       string       `json:"title"`
+	Message     string       `json:"message"`
+	PublishedAt string       `json:"publishedAt"`
+	Files       []portalFile `json:"files"`
+}
+
 type portalView struct {
-	Version   int               `json:"version"`
-	Status    string            `json:"status"`
-	Content   json.RawMessage   `json:"content"`
-	Signature *receipt          `json:"signature"`
-	Progress  *[]portalProgress `json:"progress,omitempty"`
+	Version    int               `json:"version"`
+	Status     string            `json:"status"`
+	Content    json.RawMessage   `json:"content"`
+	Signature  *receipt          `json:"signature"`
+	Progress   *[]portalProgress `json:"progress,omitempty"`
+	Deliveries *[]portalDelivery `json:"deliveries,omitempty"`
 }
 
 func linkInvalid(c *echo.Context) error {
@@ -68,7 +83,11 @@ func (s *server) getPortal(c *echo.Context) error {
 	}
 	view.Content = json.RawMessage(content)
 	if view.Status == "signed" {
-		if view.Progress, err = s.loadProgress(c.Request().Context(), projectID); err != nil {
+		ctx := c.Request().Context()
+		if view.Progress, err = s.loadProgress(ctx, projectID); err != nil {
+			return err
+		}
+		if view.Deliveries, err = s.loadPortalDeliveries(ctx, projectID); err != nil {
 			return err
 		}
 	}

@@ -153,3 +153,18 @@ func (s *server) publishDraft(c *echo.Context, p project) error {
 	}
 	return c.NoContent(http.StatusNoContent)
 }
+
+func (s *server) loadPortalDeliveries(ctx context.Context, projectID int64) (*[]portalDelivery, error) {
+	stored, err := s.loadDeliveries(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+	list := make([]portalDelivery, len(stored.Published))
+	for i, d := range stored.Published {
+		list[i] = portalDelivery{Number: *d.Number, Title: d.Title, Message: d.Message, PublishedAt: *d.PublishedAt, Files: make([]portalFile, len(d.Files))}
+		for j, f := range d.Files {
+			list[i].Files[j] = portalFile{ID: f.ID, Name: f.Name, Size: f.Size}
+		}
+	}
+	return &list, nil
+}

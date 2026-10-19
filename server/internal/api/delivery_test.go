@@ -204,3 +204,37 @@ func TestDeliveryPublishRejectsInvalidDrafts(t *testing.T) {
 		t.Errorf("unsigned = %d", rec.Code)
 	}
 }
+
+func TestDeliveryPortalListsPublishedOnly(t *testing.T) {
+	e, _ := newAttachmentServer(t)
+	a := signedUp(t, e)
+	path, l := signedProject(t, e, a)
+	url := path + "/deliveries/draft/files"
+	portal := "/api/portal/" + l.Token
+
+	var view struct {
+		Deliveries []map[string]any `json:"deliveries"`
+	}
+	decode(t, get(e, portal), &view)
+	if view.Deliveries == nil || len(view.Deliveries) != 0 {
+		t.Fatalf("before any = %v", view.Deliveries)
+	}
+	uploadTo(e, url, "file", "briefing.pdf", attachmentSamples["briefing.pdf"], a)
+	publishDraft(e, path, "Entrega final", "Segue.", a)
+	uploadTo(e, url, "file", "secret.png", attachmentSamples["logo.png"], a)
+
+	rec := get(e, portal)
+	decode(t, rec, &view)
+	if len(view.Deliveries) != 1 || strings.Contains(rec.Body.String(), "secret.png") {
+		t.Fatalf("portal = %s", rec.Body)
+	}
+	d := view.Deliveries[0]
+	files, _ := d["files"].([]any)
+	if d["number"] != float64(1) || d["title"] != "Entrega final" || d["message"] != "Segue." || d["publishedAt"] == nil || len(files) != 1 {
+		t.Fatalf("delivery = %v", d)
+	}
+	file := files[0].(map[string]any)
+	if len(file) != 3 || file["id"] == nil || file["name"] != "briefing.pdf" || file["size"] == nil {
+		t.Fatalf("file = %v", file)
+	}
+}
