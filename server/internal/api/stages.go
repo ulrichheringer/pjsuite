@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -99,12 +100,16 @@ func insertStage(ctx context.Context, tx *sql.Tx, projectID int64, in stageInput
 	if err != nil {
 		return 0, err
 	}
-	for i, title := range in.Tasks {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO stage_tasks (stage_id, position, title) VALUES (?, ?, ?)`, id, i+1, title); err != nil {
-			return 0, err
+	return id, insertTasks(ctx, tx, id, in.Tasks)
+}
+
+func insertTasks(ctx context.Context, tx *sql.Tx, stageID int64, titles []string) error {
+	for i, title := range titles {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO stage_tasks (stage_id, position, title) VALUES (?, ?, ?)`, stageID, i+1, title); err != nil {
+			return err
 		}
 	}
-	return id, nil
+	return nil
 }
 
 func (s *server) loadStages(ctx context.Context, projectID int64) ([]stage, error) {
@@ -159,8 +164,61 @@ func (s *server) listStages(c *echo.Context) error {
 	return c.JSON(http.StatusOK, stages)
 }
 
-func (s *server) createStage(c *echo.Context) error {
-	p, err := s.findProject(c)
+func (s *server) writableProject(handle func(c *echo.Context, p project) error) echo.HandlerFunc {
+	return func(c *echo.Context) error {
+		p, err := s.findProject(c)
+		if err != nil {
+			return err
+		}
+		if p.Archived {
+			return invalid(c, http.StatusConflict, fieldErrors{"archived": "Projeto arquivado."})
+		}
+		return handle(c, p)
+	}
+}
+
+func (s *server) inTx(c *echo.Context, do func(ctx context.Context, tx *sql.Tx) error) error {
+	ctx := c.Request().Context()
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := do(ctx, tx); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (s *server) createStage(c *echo.Context, p project) error {
+	in, errs, err := s.bindStage(c)
+	if err != nil {
+		return err
+	}
+	if len(errs) > 0 {
+		return invalid(c, http.StatusBadRequest, errs)
+	}
+	var id int64
+	err = s.inTx(c, func(ctx context.Context, tx *sql.Tx) (err error) {
+		id, err = insertStage(ctx, tx, p.ID, in)
+		return err
+	})
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusCreated, map[string]int64{"id": id})
+}
+
+func stageID(c *echo.Context) (int64, error) {
+	id, err := strconv.ParseInt(c.Param("sid"), 10, 64)
+	if err != nil {
+		return 0, echo.ErrNotFound
+	}
+	return id, nil
+}
+
+func (s *server) putStage(c *echo.Context, p project) error {
+	id, err := stageID(c)
 	if err != nil {
 		return err
 	}
@@ -171,18 +229,81 @@ func (s *server) createStage(c *echo.Context) error {
 	if len(errs) > 0 {
 		return invalid(c, http.StatusBadRequest, errs)
 	}
-	ctx := c.Request().Context()
-	tx, err := s.db.BeginTx(ctx, nil)
+	err = s.inTx(c, func(ctx context.Context, tx *sql.Tx) error {
+		res, err := tx.ExecContext(ctx,
+			`UPDATE stages SET name = ?, timing_kind = ?, timing = ?, deliverable = ?, visible = ? WHERE id = ? AND project_id = ?`,
+			in.Name, in.TimingKind, in.Timing, in.Deliverable, in.Visible, id, p.ID)
+		if err != nil {
+			return err
+		}
+		if err := requireAffected(res); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM stage_tasks WHERE stage_id = ?`, id); err != nil {
+			return err
+		}
+		return insertTasks(ctx, tx, id, in.Tasks)
+	})
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
-	id, err := insertStage(ctx, tx, p.ID, in)
+	return c.NoContent(http.StatusNoContent)
+}
+
+func requireAffected(res sql.Result) error {
+	n, err := res.RowsAffected()
 	if err != nil {
 		return err
 	}
-	if err := tx.Commit(); err != nil {
+	if n == 0 {
+		return echo.ErrNotFound
+	}
+	return nil
+}
+
+func (s *server) deleteStage(c *echo.Context, p project) error {
+	id, err := stageID(c)
+	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusCreated, map[string]int64{"id": id})
+	res, err := s.db.ExecContext(c.Request().Context(), `DELETE FROM stages WHERE id = ? AND project_id = ?`, id, p.ID)
+	if err != nil {
+		return err
+	}
+	if err := requireAffected(res); err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (s *server) putStageOrder(c *echo.Context, p project) error {
+	var req struct {
+		IDs []int64 `json:"ids"`
+	}
+	if err := c.Bind(&req); err != nil {
+		return echo.ErrBadRequest
+	}
+	current, err := s.loadStages(c.Request().Context(), p.ID)
+	if err != nil {
+		return err
+	}
+	want := make([]int64, len(current))
+	for i, st := range current {
+		want[i] = st.ID
+	}
+	if got := slices.Sorted(slices.Values(req.IDs)); !slices.Equal(got, slices.Sorted(slices.Values(want))) {
+		return invalid(c, http.StatusBadRequest, fieldErrors{"ids": "Informe todas as etapas do projeto, uma vez cada."})
+	}
+	err = s.inTx(c, func(ctx context.Context, tx *sql.Tx) error {
+		for i, id := range req.IDs {
+			if _, err := tx.ExecContext(ctx, `UPDATE stages SET position = ? WHERE id = ?`, i+1, id); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
 }
