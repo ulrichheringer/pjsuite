@@ -59,6 +59,14 @@ END;
 -- +goose StatementEnd
 
 -- +goose StatementBegin
+CREATE TRIGGER contract_versions_no_insert_after_sign BEFORE INSERT ON contract_versions
+WHEN EXISTS (SELECT 1 FROM signatures WHERE project_id = NEW.project_id)
+BEGIN
+    SELECT RAISE(ABORT, 'signed contracts accept no new versions');
+END;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
 CREATE TRIGGER signatures_no_update BEFORE UPDATE ON signatures
 BEGIN
     SELECT RAISE(ABORT, 'signatures are immutable');
@@ -80,6 +88,7 @@ PRAGMA foreign_keys = ON;
 PRAGMA foreign_keys = OFF;
 BEGIN;
 
+DROP TRIGGER contract_versions_no_insert_after_sign;
 DROP TRIGGER signatures_no_delete;
 DROP TRIGGER signatures_no_update;
 DROP TRIGGER contract_versions_no_delete;
