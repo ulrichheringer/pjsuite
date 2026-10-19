@@ -62,7 +62,7 @@ Social login, plans/billing, marketplace, templates marketplace, automated email
 - [x] Builder attachments: R2 upload behind a storage interface (in-memory fake in tests), 20 MB limit, pdf/jpg/png/zip
 - [x] Visibility + contract: block visibility, client preview, contract version 1, PDF view
 - [x] Share + client review: link token, portal review, request change, refuse, invalid link
-- [ ] Revision + sign: new version flow, sign with receipt, immutability enforced
+- [x] Revision + sign: new version flow, sign with receipt, immutability enforced
 - [ ] Execution: tasks checklist, stage progress, file uploads to stages
 - [ ] Delivery: publish delivery, client delivery view, token-checked downloads
 - [ ] Adjustment + approval: adjustment cycle, approve, conclude
