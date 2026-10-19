@@ -1,4 +1,8 @@
 -- +goose Up
+ALTER TABLE projects ADD COLUMN scope TEXT NOT NULL DEFAULT '';
+ALTER TABLE projects ADD COLUMN outcome TEXT NOT NULL DEFAULT '';
+ALTER TABLE projects ADD COLUMN notes TEXT NOT NULL DEFAULT '';
+
 CREATE TABLE stages (
     id          INTEGER PRIMARY KEY,
     project_id  INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -24,3 +28,6 @@ CREATE INDEX stage_tasks_stage_id ON stage_tasks(stage_id, position);
 -- +goose Down
 DROP TABLE stage_tasks;
 DROP TABLE stages;
+ALTER TABLE projects DROP COLUMN notes;
+ALTER TABLE projects DROP COLUMN outcome;
+ALTER TABLE projects DROP COLUMN scope;

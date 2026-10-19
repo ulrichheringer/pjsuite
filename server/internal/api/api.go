@@ -52,5 +52,6 @@ func New(db *sql.DB) *echo.Echo {
 	g.PUT("/projects/:id/stages/order", s.writableProject(s.putStageOrder), s.requireAuth, bodyLimit)
 	g.PUT("/projects/:id/stages/:sid", s.writableProject(s.putStage), s.requireAuth, bodyLimit)
 	g.DELETE("/projects/:id/stages/:sid", s.writableProject(s.deleteStage), s.requireAuth)
+	g.PUT("/projects/:id/builder", s.writableProject(s.putBuilder), s.requireAuth, bodyLimit)
 	return e
 }

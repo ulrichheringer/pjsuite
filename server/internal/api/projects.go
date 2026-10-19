@@ -16,7 +16,7 @@ import (
 const (
 	maxProjectNameRunes = 120
 	maxReferenceRunes   = 40
-	projectSelect       = `SELECT p.id, p.client_id, c.name, p.name, p.area, p.reference, p.goal, p.structure, p.status, p.archived_at IS NOT NULL
+	projectSelect       = `SELECT p.id, p.client_id, c.name, p.name, p.area, p.reference, p.goal, p.structure, p.status, p.archived_at IS NOT NULL, p.scope, p.outcome, p.notes
 		FROM projects p JOIN clients c ON c.id = p.client_id`
 )
 
@@ -33,10 +33,13 @@ type project struct {
 	Structure  string `json:"structure"`
 	Status     string `json:"status"`
 	Archived   bool   `json:"archived"`
+	Scope      string `json:"scope"`
+	Outcome    string `json:"outcome"`
+	Notes      string `json:"notes"`
 }
 
 func (p *project) scan(row interface{ Scan(...any) error }) error {
-	return row.Scan(&p.ID, &p.ClientID, &p.ClientName, &p.Name, &p.Area, &p.Reference, &p.Goal, &p.Structure, &p.Status, &p.Archived)
+	return row.Scan(&p.ID, &p.ClientID, &p.ClientName, &p.Name, &p.Area, &p.Reference, &p.Goal, &p.Structure, &p.Status, &p.Archived, &p.Scope, &p.Outcome, &p.Notes)
 }
 
 func (p *project) normalize() {
