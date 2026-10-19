@@ -29,6 +29,7 @@ function VisibilityPage() {
   const [view, setView] = useState<ClientView>();
   const [loadFailed, setLoadFailed] = useState(false);
   const [problem, setProblem] = useState<string>();
+  const [saving, setSaving] = useState<VisibilityBlock[]>([]);
 
   useEffect(() => {
     Promise.all([getProject(id), getVisibility(id), getClientView(id)]).then(
@@ -63,11 +64,13 @@ function VisibilityPage() {
   }
 
   async function toggle(block: VisibilityBlock, on: boolean) {
+    setSaving((current) => [...current, block]);
     const saved = await saveVisibility(id, { [block]: on });
+    setSaving((current) => current.filter((pending) => pending !== block));
     if (saved.kind === "unauthorized") return navigate({ to: "/entrar" });
     if (saved.kind !== "ok") return setProblem("Não foi possível salvar a visibilidade.");
     setProblem(undefined);
-    setVisible({ ...visible, [block]: on });
+    setVisible((current) => ({ ...current, [block]: on }));
     const preview = await getClientView(id);
     if (preview.kind === "unauthorized") return navigate({ to: "/entrar" });
     if (preview.kind !== "ok") return setProblem("Não foi possível atualizar a prévia.");
@@ -116,7 +119,7 @@ function VisibilityPage() {
                 <Switch
                   id={`visible-${block}`}
                   checked={visible[block] ?? true}
-                  disabled={project.archived}
+                  disabled={project.archived || saving.includes(block)}
                   onCheckedChange={(on) => toggle(block, on)}
                 />
               </div>

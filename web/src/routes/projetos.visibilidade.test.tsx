@@ -100,6 +100,37 @@ test("toggling a block saves it and hides it from the preview", async () => {
   expect(within(preview as HTMLElement).getByText("Retratos em estúdio")).toBeVisible();
 });
 
+test("overlapping saves keep every toggle and lock the pending switch", async () => {
+  const visible: Record<string, boolean> = Object.fromEntries(blocks.map((b) => [b, true]));
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  mockFetch(async (path, init) => {
+    if (path === "/api/projects/5" && !init?.method) return jsonResponse(200, project);
+    if (path === "/api/projects/5/visibility" && !init?.method) return jsonResponse(200, visible);
+    if (path === "/api/projects/5/visibility" && init?.method === "PUT") {
+      const patch = JSON.parse(String(init.body));
+      if ("scope" in patch) await held;
+      Object.assign(visible, patch);
+      return new Response(null, { status: 204 });
+    }
+    if (path === "/api/projects/5/client-view") return jsonResponse(200, clientView(visible));
+    return jsonResponse(500);
+  });
+  renderAt("/projetos/5/visibilidade");
+
+  await userEvent.click(await screen.findByRole("switch", { name: /Escopo/ }));
+  expect(screen.getByRole("switch", { name: /Escopo/ })).toBeDisabled();
+  await userEvent.click(screen.getByRole("switch", { name: /Preço e condições/ }));
+  await waitFor(() =>
+    expect(screen.getByRole("switch", { name: /Preço e condições/ })).not.toBeChecked(),
+  );
+  release();
+
+  await waitFor(() => expect(screen.getByRole("switch", { name: /Escopo/ })).not.toBeChecked());
+  expect(screen.getByRole("switch", { name: /Escopo/ })).toBeEnabled();
+  expect(screen.getByRole("switch", { name: /Preço e condições/ })).not.toBeChecked();
+});
+
 test("a failed save keeps the switch and shows an error", async () => {
   mockFetch((path, init) => {
     if (path === "/api/projects/5" && !init?.method) return jsonResponse(200, project);
