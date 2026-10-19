@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Plus, Trash2 } from "lucide-react";
+import { AlertCircle, Plus, Trash2 } from "lucide-react";
 import {
   getPayments,
   paymentKindLabels,
   paymentTriggerLabels,
+  savePayments,
+  type FieldErrors,
   type Payment,
 } from "@/api";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
@@ -12,6 +14,21 @@ import { Slider } from "@/components/ui/slider";
 import { Banner, Button, Field } from "@/ui";
 
 type Row = Payment & { key: number };
+
+const presets: Record<string, Payment[]> = {
+  "30% + saldo": [
+    { kind: "entrada", percent: 30, trigger: "assinatura", due: "Na assinatura do contrato" },
+    { kind: "saldo", percent: 70, trigger: "antes_entrega", due: "Antes da publicação final" },
+  ],
+  "3 parcelas": [
+    { kind: "entrada", percent: 35, trigger: "assinatura", due: "Na assinatura do contrato" },
+    { kind: "parcela", percent: 35, trigger: "etapa", due: "No início da execução" },
+    { kind: "saldo", percent: 30, trigger: "antes_entrega", due: "Antes da publicação final" },
+  ],
+  "À vista": [
+    { kind: "unico", percent: 100, trigger: "assinatura", due: "Na assinatura do contrato" },
+  ],
+};
 
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -35,6 +52,10 @@ export function PaymentPlan({ projectId, readOnly }: { projectId: string; readOn
   const [priceText, setPriceText] = useState("0");
   const [rows, setRows] = useState<Row[]>([]);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [problem, setProblem] = useState<string>();
+  const [saved, setSaved] = useState(false);
+  const [pending, setPending] = useState(false);
 
   useEffect(() => {
     getPayments(projectId).then((outcome) => {
@@ -48,22 +69,65 @@ export function PaymentPlan({ projectId, readOnly }: { projectId: string; readOn
   const priceCents = parseCents(priceText);
   const distributed = rows.reduce((sum, row) => sum + row.percent, 0);
   const values = amounts(priceCents, rows);
+  const edit = (next: Row[]) => {
+    setSaved(false);
+    setRows(next);
+  };
   const update = (key: number, patch: Partial<Payment>) =>
-    setRows(rows.map((row) => (row.key === key ? { ...row, ...patch } : row)));
+    edit(rows.map((row) => (row.key === key ? { ...row, ...patch } : row)));
+  const applyPreset = (name: string) =>
+    edit(presets[name]!.map((payment) => ({ ...payment, key: nextKey.current++ })));
+
+  async function save() {
+    setPending(true);
+    const outcome = await savePayments(projectId, {
+      priceCents,
+      payments: rows.map(({ kind, percent, trigger, due }) => ({ kind, percent, trigger, due })),
+    });
+    setPending(false);
+    if (outcome.kind === "unauthorized") return navigate({ to: "/entrar" });
+    setErrors(outcome.kind === "invalid" ? outcome.errors : {});
+    setProblem(outcome.kind === "ok" ? undefined : "Não foi possível salvar o plano de pagamento.");
+    setSaved(outcome.kind === "ok");
+  }
 
   return (
     <section className="surface">
       <div className="row-between section-heading">
         <h2>04 / Investimento e plano de pagamento</h2>
       </div>
-      {loadFailed && <Banner title="Não foi possível carregar o plano de pagamento." tone="danger" />}
+      {loadFailed && (
+        <Banner title="Não foi possível carregar o plano de pagamento." tone="danger" />
+      )}
+      {problem && (
+        <Banner title={problem} tone="danger">
+          Seus dados foram mantidos. Confira os campos e tente novamente.
+        </Banner>
+      )}
+      {saved && <Banner title="Plano de pagamento salvo." tone="success" />}
       <div className="payment-head">
         <Field
           label="Valor total do projeto (R$)"
           value={priceText}
+          error={errors.priceCents}
           disabled={readOnly}
-          onChange={(text) => setPriceText(text.replace(/[^\d,]/g, ""))}
+          onChange={(text) => {
+            setSaved(false);
+            setPriceText(text.replace(/[^\d,]/g, ""));
+          }}
         />
+        {!readOnly && (
+          <div className="payment-presets">
+            <span className="field-label">Usar uma estrutura</span>
+            <div>
+              {Object.keys(presets).map((name) => (
+                <button type="button" key={name} onClick={() => applyPreset(name)}>
+                  {name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
       <div className="payment-progress">
         <div style={{ width: `${Math.min(distributed, 100)}%` }} />
@@ -71,7 +135,9 @@ export function PaymentPlan({ projectId, readOnly }: { projectId: string; readOn
       <div className={`payment-balance ${distributed === 100 ? "balanced" : ""}`}>
         <strong>{distributed}% distribuído</strong>
         <span>
-          {distributed === 100 ? "Plano fechado" : `Faltam ${100 - distributed}% para fechar o valor`}
+          {distributed === 100
+            ? "Plano fechado"
+            : `Faltam ${100 - distributed}% para fechar o valor`}
         </span>
       </div>
       <div className="payment-list">
@@ -167,6 +233,17 @@ export function PaymentPlan({ projectId, readOnly }: { projectId: string; readOn
           }
         >
           <Plus size={16} /> Adicionar pagamento
+        </Button>
+      )}
+      {errors.payments && (
+        <span className="field-error">
+          <AlertCircle size={14} />
+          {errors.payments}
+        </span>
+      )}
+      {!readOnly && (
+        <Button className="full" disabled={pending} onClick={save}>
+          {pending ? "Salvando…" : "Salvar plano"}
         </Button>
       )}
       <p className="small payment-note">

@@ -348,11 +348,11 @@ test("payment plan shows the total, computed values and the distributed balance"
   builderRoutes();
   renderAt("/projetos/5/montagem");
   const user = userEvent.setup();
-  expect(await screen.findByLabelText("Valor total do projeto (R$)")).toHaveValue("1500");
   const cards = await screen.findAllByRole("article");
   expect(cards).toHaveLength(2);
-  expect(cards[0]).toHaveTextContent(/R\$\s450,00/);
-  expect(cards[1]).toHaveTextContent(/R\$\s750,00/);
+  expect(screen.getByLabelText("Valor total do projeto (R$)")).toHaveValue("1500");
+  expect(cards[0]!.textContent).toMatch(/R\$\s450,00/);
+  expect(cards[1]!.textContent).toMatch(/R\$\s750,00/);
   expect(screen.getByText("80% distribuído")).toBeInTheDocument();
   expect(screen.getByText("Faltam 20% para fechar o valor")).toBeInTheDocument();
 
@@ -360,15 +360,67 @@ test("payment plan shows the total, computed values and the distributed balance"
   slider.focus();
   await user.keyboard("{ArrowRight}");
   expect(cards[0]).toHaveTextContent("35%");
-  expect(cards[0]).toHaveTextContent(/R\$\s525,00/);
+  expect(cards[0]!.textContent).toMatch(/R\$\s525,00/);
   expect(screen.getByText("85% distribuído")).toBeInTheDocument();
 
   await user.clear(screen.getByLabelText("Valor total do projeto (R$)"));
   await user.type(screen.getByLabelText("Valor total do projeto (R$)"), "2000");
-  expect(cards[0]).toHaveTextContent(/R\$\s700,00/);
+  expect(cards[0]!.textContent).toMatch(/R\$\s700,00/);
 
   await user.click(screen.getByRole("button", { name: "Adicionar pagamento" }));
   expect(screen.getAllByRole("article")).toHaveLength(3);
   await user.click(screen.getByRole("button", { name: "Remover Parcela intermediária" }));
+  expect(screen.getAllByRole("article")).toHaveLength(2);
+});
+
+test("a preset replaces the plan and Salvar puts it", async () => {
+  const fetchSpy = builderRoutes((path, init) =>
+    path === "/api/projects/5/payments" && init?.method === "PUT" ? jsonResponse(204) : undefined,
+  );
+  renderAt("/projetos/5/montagem");
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "3 parcelas" }));
+  expect(screen.getAllByRole("article")).toHaveLength(3);
+  expect(screen.getByText("100% distribuído")).toBeInTheDocument();
+  expect(screen.getByText("Plano fechado")).toBeInTheDocument();
+  expect(fetchSpy.mock.calls.some(([, init]) => init?.method === "PUT")).toBe(false);
+
+  await user.click(screen.getByRole("button", { name: "Salvar plano" }));
+  expect(await screen.findByText("Plano de pagamento salvo.")).toBeInTheDocument();
+  const [body] = sentBodies(fetchSpy.mock.calls, "PUT", "/api/projects/5/payments");
+  expect(body.priceCents).toBe(150000);
+  expect(body.payments.map((p: { kind: string; percent: number }) => [p.kind, p.percent])).toEqual([
+    ["entrada", 35],
+    ["parcela", 35],
+    ["saldo", 30],
+  ]);
+
+  await user.click(screen.getByRole("button", { name: "À vista" }));
+  expect(screen.getAllByRole("article")).toHaveLength(1);
+  await user.click(screen.getByRole("button", { name: "30% + saldo" }));
+  expect(screen.getAllByRole("article")).toHaveLength(2);
+  expect(screen.getByText("100% distribuído")).toBeInTheDocument();
+});
+
+test("rejected payment plan shows the server errors and keeps the edits", async () => {
+  builderRoutes((path, init) =>
+    path === "/api/projects/5/payments" && init?.method === "PUT"
+      ? jsonResponse(400, {
+          errors: {
+            priceCents: "Informe um valor entre R$ 0 e R$ 10.000.000.",
+            payments: "A soma dos percentuais passa de 100%.",
+          },
+        })
+      : undefined,
+  );
+  renderAt("/projetos/5/montagem");
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "Salvar plano" }));
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Não foi possível salvar o plano de pagamento.",
+  );
+  expect(screen.getByText("A soma dos percentuais passa de 100%.")).toBeInTheDocument();
+  expect(screen.getByText("Informe um valor entre R$ 0 e R$ 10.000.000.")).toBeInTheDocument();
   expect(screen.getAllByRole("article")).toHaveLength(2);
 });
