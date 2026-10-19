@@ -78,6 +78,7 @@ func New(db *sql.DB, files storage.Store) *echo.Echo {
 	g.POST("/portal/:token/change", s.postChange, bodyLimit)
 	g.POST("/portal/:token/refuse", s.postRefuse, bodyLimit)
 	g.POST("/portal/:token/sign", s.postSign, bodyLimit)
+	g.GET("/portal/:token/deliveries/:n/files/:fid", s.downloadPortalFile)
 	g.GET("/projects/:id/execution", s.getExecution, s.requireAuth)
 	g.POST("/projects/:id/stages/:sid/tasks", s.executableProject(s.addTask), s.requireAuth, bodyLimit)
 	g.PUT("/projects/:id/tasks/:tid", s.executableProject(s.putTask), s.requireAuth, bodyLimit)
@@ -87,5 +88,9 @@ func New(db *sql.DB, files storage.Store) *echo.Echo {
 	g.POST("/projects/:id/stages/:sid/files", s.executableProject(s.uploadStageFile), s.requireAuth)
 	g.GET("/projects/:id/stages/:sid/files/:fid", s.downloadStageFile, s.requireAuth)
 	g.DELETE("/projects/:id/stages/:sid/files/:fid", s.executableProject(s.deleteStageFile), s.requireAuth)
+	g.GET("/projects/:id/deliveries", s.listDeliveries, s.requireAuth)
+	g.POST("/projects/:id/deliveries/draft/files", s.executableProject(s.uploadDraftFile), s.requireAuth)
+	g.DELETE("/projects/:id/deliveries/draft/files/:fid", s.executableProject(s.deleteDraftFile), s.requireAuth)
+	g.POST("/projects/:id/deliveries/draft/publish", s.executableProject(s.publishDraft), s.requireAuth, bodyLimit)
 	return e
 }
