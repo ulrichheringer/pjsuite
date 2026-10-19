@@ -4,10 +4,25 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
+	"io"
+	"log/slog"
 	"net/http"
 	"path/filepath"
+	"slices"
+	"strings"
 
 	"github.com/labstack/echo/v5"
+)
+
+const (
+	maxAttachmentBytes = 20 << 20
+	multipartOverhead  = 1 << 20
+)
+
+var (
+	attachmentExtensions = []string{".pdf", ".jpg", ".jpeg", ".png", ".zip"}
+	attachmentTypes      = []string{"application/pdf", "image/jpeg", "image/png", "application/zip"}
 )
 
 type attachment struct {
@@ -19,9 +34,17 @@ type attachment struct {
 }
 
 func (s *server) uploadAttachment(c *echo.Context, p project) error {
+	c.Request().Body = http.MaxBytesReader(c.Response(), c.Request().Body, maxAttachmentBytes+multipartOverhead)
 	header, err := c.FormFile("file")
+	var tooLarge *http.MaxBytesError
+	if errors.As(err, &tooLarge) {
+		return echo.ErrStatusRequestEntityTooLarge
+	}
 	if err != nil {
-		return echo.ErrBadRequest
+		return invalid(c, http.StatusBadRequest, fieldErrors{"file": "Selecione um arquivo."})
+	}
+	if header.Size > maxAttachmentBytes {
+		return echo.ErrStatusRequestEntityTooLarge
 	}
 	file, err := header.Open()
 	if err != nil {
@@ -29,9 +52,16 @@ func (s *server) uploadAttachment(c *echo.Context, p project) error {
 	}
 	defer file.Close()
 	sniff := make([]byte, 512)
-	n, _ := file.Read(sniff)
+	n, err := io.ReadFull(file, sniff)
+	if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) && !errors.Is(err, io.EOF) {
+		return err
+	}
 	contentType := http.DetectContentType(sniff[:n])
-	if _, err := file.Seek(0, 0); err != nil {
+	name := filepath.Base(header.Filename)
+	if !slices.Contains(attachmentExtensions, strings.ToLower(filepath.Ext(name))) || !slices.Contains(attachmentTypes, contentType) {
+		return invalid(c, http.StatusBadRequest, fieldErrors{"file": "Envie PDF, JPG, PNG ou ZIP."})
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
 		return err
 	}
 	raw := make([]byte, 16)
@@ -39,7 +69,6 @@ func (s *server) uploadAttachment(c *echo.Context, p project) error {
 		return err
 	}
 	key := hex.EncodeToString(raw)
-	name := filepath.Base(header.Filename)
 	ctx := c.Request().Context()
 	if err := s.files.Put(ctx, key, file, header.Size, contentType); err != nil {
 		return err
@@ -49,7 +78,9 @@ func (s *server) uploadAttachment(c *echo.Context, p project) error {
 		`INSERT INTO attachments (project_id, key, name, content_type, size) VALUES (?, ?, ?, ?, ?) RETURNING id, created_at`,
 		p.ID, key, a.Name, a.ContentType, a.Size).Scan(&a.ID, &a.CreatedAt)
 	if err != nil {
-		s.files.Delete(context.WithoutCancel(ctx), key)
+		if delErr := s.files.Delete(context.WithoutCancel(ctx), key); delErr != nil {
+			slog.Error("delete orphan attachment", "key", key, "err", delErr)
+		}
 		return err
 	}
 	return c.JSON(http.StatusCreated, a)

@@ -5,6 +5,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/labstack/echo/v5"
@@ -85,5 +86,59 @@ func TestAttachmentUploadStoresObjectAndRow(t *testing.T) {
 				t.Fatalf("list = %+v, want [%+v]", list, got)
 			}
 		})
+	}
+}
+
+func TestAttachmentUploadRejections(t *testing.T) {
+	pdf := attachmentSamples["briefing.pdf"]
+	tests := []struct {
+		name   string
+		file   string
+		field  string
+		data   []byte
+		status int
+	}{
+		{"too large", "big.zip", "file", append([]byte{'P', 'K', 3, 4}, make([]byte, 20<<20)...), http.StatusRequestEntityTooLarge},
+		{"bad extension", "notes.txt", "file", pdf, http.StatusBadRequest},
+		{"no extension", "notes", "file", pdf, http.StatusBadRequest},
+		{"sniffed type mismatch", "fake.pdf", "file", []byte("just text"), http.StatusBadRequest},
+		{"wrong field", "briefing.pdf", "doc", pdf, http.StatusBadRequest},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			e, files := newAttachmentServer(t)
+			a := signedUp(t, e)
+			path := blankProject(t, e, a)
+			rec := upload(e, path, tc.field, tc.file, tc.data, a)
+			if rec.Code != tc.status {
+				t.Fatalf("status = %d, want %d: %.200s", rec.Code, tc.status, rec.Body)
+			}
+			if tc.status == http.StatusBadRequest && !strings.Contains(rec.Body.String(), `"errors"`) {
+				t.Fatalf("body = %s", rec.Body)
+			}
+			if files.Len() != 0 || len(listAttachments(t, e, path, a)) != 0 {
+				t.Fatal("rejected upload left data behind")
+			}
+		})
+	}
+}
+
+func TestAttachmentUploadScopedAndWritable(t *testing.T) {
+	e, files := newAttachmentServer(t)
+	a := signedUp(t, e)
+	b := signedUpAs(t, e, "bruno@example.com")
+	path := blankProject(t, e, a)
+	pdf := attachmentSamples["briefing.pdf"]
+	if rec := upload(e, path, "file", "briefing.pdf", pdf, b); rec.Code != http.StatusNotFound {
+		t.Fatalf("other user = %d", rec.Code)
+	}
+	if rec := send(e, http.MethodPost, path+"/archive", nil, a); rec.Code != http.StatusNoContent {
+		t.Fatalf("archive = %d", rec.Code)
+	}
+	if rec := upload(e, path, "file", "briefing.pdf", pdf, a); rec.Code != http.StatusConflict {
+		t.Fatalf("archived = %d", rec.Code)
+	}
+	if files.Len() != 0 {
+		t.Fatal("rejected upload left data behind")
 	}
 }
