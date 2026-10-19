@@ -16,9 +16,13 @@ import { Route as PerfilRouteImport } from './routes/perfil'
 import { Route as ClientesIndexRouteImport } from './routes/clientes.index'
 import { Route as ClientesIdRouteImport } from './routes/clientes.$id'
 import { Route as ClientesNovoRouteImport } from './routes/clientes.novo'
+import { Route as PTokenRouteImport } from './routes/p.$token'
 import { Route as ProjetosIndexRouteImport } from './routes/projetos.index'
 import { Route as ProjetosIdRouteImport } from './routes/projetos.$id'
 import { Route as ProjetosNovoRouteImport } from './routes/projetos.novo'
+import { Route as PTokenAlteracaoRouteImport } from './routes/p.$token_.alteracao'
+import { Route as PTokenRecusarRouteImport } from './routes/p.$token_.recusar'
+import { Route as ProjetosIdCompartilharRouteImport } from './routes/projetos.$id_.compartilhar'
 import { Route as ProjetosIdMontagemRouteImport } from './routes/projetos.$id_.montagem'
 import { Route as ProjetosIdVisibilidadeRouteImport } from './routes/projetos.$id_.visibilidade'
 import { Route as ProjetosIdContratoIndexRouteImport } from './routes/projetos.$id_.contrato.index'
@@ -59,6 +63,11 @@ const ClientesNovoRoute = ClientesNovoRouteImport.update({
   path: '/clientes/novo',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PTokenRoute = PTokenRouteImport.update({
+  id: '/p/$token',
+  path: '/p/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProjetosIndexRoute = ProjetosIndexRouteImport.update({
   id: '/projetos/',
   path: '/projetos/',
@@ -72,6 +81,21 @@ const ProjetosIdRoute = ProjetosIdRouteImport.update({
 const ProjetosNovoRoute = ProjetosNovoRouteImport.update({
   id: '/projetos/novo',
   path: '/projetos/novo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PTokenAlteracaoRoute = PTokenAlteracaoRouteImport.update({
+  id: '/p/$token_/alteracao',
+  path: '/p/$token/alteracao',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PTokenRecusarRoute = PTokenRecusarRouteImport.update({
+  id: '/p/$token_/recusar',
+  path: '/p/$token/recusar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjetosIdCompartilharRoute = ProjetosIdCompartilharRouteImport.update({
+  id: '/projetos/$id_/compartilhar',
+  path: '/projetos/$id/compartilhar',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProjetosIdMontagemRoute = ProjetosIdMontagemRouteImport.update({
@@ -103,10 +127,14 @@ export interface FileRoutesByFullPath {
   '/perfil': typeof PerfilRoute
   '/clientes/$id': typeof ClientesIdRoute
   '/clientes/novo': typeof ClientesNovoRoute
+  '/p/$token': typeof PTokenRoute
   '/projetos/$id': typeof ProjetosIdRoute
   '/projetos/novo': typeof ProjetosNovoRoute
   '/clientes/': typeof ClientesIndexRoute
   '/projetos/': typeof ProjetosIndexRoute
+  '/p/$token/alteracao': typeof PTokenAlteracaoRoute
+  '/p/$token/recusar': typeof PTokenRecusarRoute
+  '/projetos/$id/compartilhar': typeof ProjetosIdCompartilharRoute
   '/projetos/$id/montagem': typeof ProjetosIdMontagemRoute
   '/projetos/$id/visibilidade': typeof ProjetosIdVisibilidadeRoute
   '/projetos/$id/contrato/$version': typeof ProjetosIdContratoVersionRoute
@@ -119,10 +147,14 @@ export interface FileRoutesByTo {
   '/perfil': typeof PerfilRoute
   '/clientes/$id': typeof ClientesIdRoute
   '/clientes/novo': typeof ClientesNovoRoute
+  '/p/$token': typeof PTokenRoute
   '/projetos/$id': typeof ProjetosIdRoute
   '/projetos/novo': typeof ProjetosNovoRoute
   '/clientes': typeof ClientesIndexRoute
   '/projetos': typeof ProjetosIndexRoute
+  '/p/$token/alteracao': typeof PTokenAlteracaoRoute
+  '/p/$token/recusar': typeof PTokenRecusarRoute
+  '/projetos/$id/compartilhar': typeof ProjetosIdCompartilharRoute
   '/projetos/$id/montagem': typeof ProjetosIdMontagemRoute
   '/projetos/$id/visibilidade': typeof ProjetosIdVisibilidadeRoute
   '/projetos/$id/contrato/$version': typeof ProjetosIdContratoVersionRoute
@@ -136,10 +168,14 @@ export interface FileRoutesById {
   '/perfil': typeof PerfilRoute
   '/clientes/$id': typeof ClientesIdRoute
   '/clientes/novo': typeof ClientesNovoRoute
+  '/p/$token': typeof PTokenRoute
   '/projetos/$id': typeof ProjetosIdRoute
   '/projetos/novo': typeof ProjetosNovoRoute
   '/clientes/': typeof ClientesIndexRoute
   '/projetos/': typeof ProjetosIndexRoute
+  '/p/$token_/alteracao': typeof PTokenAlteracaoRoute
+  '/p/$token_/recusar': typeof PTokenRecusarRoute
+  '/projetos/$id_/compartilhar': typeof ProjetosIdCompartilharRoute
   '/projetos/$id_/montagem': typeof ProjetosIdMontagemRoute
   '/projetos/$id_/visibilidade': typeof ProjetosIdVisibilidadeRoute
   '/projetos/$id_/contrato/$version': typeof ProjetosIdContratoVersionRoute
@@ -154,10 +190,14 @@ export interface FileRouteTypes {
     | '/perfil'
     | '/clientes/$id'
     | '/clientes/novo'
+    | '/p/$token'
     | '/projetos/$id'
     | '/projetos/novo'
     | '/clientes/'
     | '/projetos/'
+    | '/p/$token/alteracao'
+    | '/p/$token/recusar'
+    | '/projetos/$id/compartilhar'
     | '/projetos/$id/montagem'
     | '/projetos/$id/visibilidade'
     | '/projetos/$id/contrato/$version'
@@ -170,10 +210,14 @@ export interface FileRouteTypes {
     | '/perfil'
     | '/clientes/$id'
     | '/clientes/novo'
+    | '/p/$token'
     | '/projetos/$id'
     | '/projetos/novo'
     | '/clientes'
     | '/projetos'
+    | '/p/$token/alteracao'
+    | '/p/$token/recusar'
+    | '/projetos/$id/compartilhar'
     | '/projetos/$id/montagem'
     | '/projetos/$id/visibilidade'
     | '/projetos/$id/contrato/$version'
@@ -186,10 +230,14 @@ export interface FileRouteTypes {
     | '/perfil'
     | '/clientes/$id'
     | '/clientes/novo'
+    | '/p/$token'
     | '/projetos/$id'
     | '/projetos/novo'
     | '/clientes/'
     | '/projetos/'
+    | '/p/$token_/alteracao'
+    | '/p/$token_/recusar'
+    | '/projetos/$id_/compartilhar'
     | '/projetos/$id_/montagem'
     | '/projetos/$id_/visibilidade'
     | '/projetos/$id_/contrato/$version'
@@ -203,10 +251,14 @@ export interface RootRouteChildren {
   PerfilRoute: typeof PerfilRoute
   ClientesIdRoute: typeof ClientesIdRoute
   ClientesNovoRoute: typeof ClientesNovoRoute
+  PTokenRoute: typeof PTokenRoute
   ProjetosIdRoute: typeof ProjetosIdRoute
   ProjetosNovoRoute: typeof ProjetosNovoRoute
   ClientesIndexRoute: typeof ClientesIndexRoute
   ProjetosIndexRoute: typeof ProjetosIndexRoute
+  PTokenAlteracaoRoute: typeof PTokenAlteracaoRoute
+  PTokenRecusarRoute: typeof PTokenRecusarRoute
+  ProjetosIdCompartilharRoute: typeof ProjetosIdCompartilharRoute
   ProjetosIdMontagemRoute: typeof ProjetosIdMontagemRoute
   ProjetosIdVisibilidadeRoute: typeof ProjetosIdVisibilidadeRoute
   ProjetosIdContratoVersionRoute: typeof ProjetosIdContratoVersionRoute
@@ -264,6 +316,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ClientesNovoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/p/$token': {
+      id: '/p/$token'
+      path: '/p/$token'
+      fullPath: '/p/$token'
+      preLoaderRoute: typeof PTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/projetos/': {
       id: '/projetos/'
       path: '/projetos'
@@ -283,6 +342,27 @@ declare module '@tanstack/react-router' {
       path: '/projetos/novo'
       fullPath: '/projetos/novo'
       preLoaderRoute: typeof ProjetosNovoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/p/$token_/alteracao': {
+      id: '/p/$token_/alteracao'
+      path: '/p/$token/alteracao'
+      fullPath: '/p/$token/alteracao'
+      preLoaderRoute: typeof PTokenAlteracaoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/p/$token_/recusar': {
+      id: '/p/$token_/recusar'
+      path: '/p/$token/recusar'
+      fullPath: '/p/$token/recusar'
+      preLoaderRoute: typeof PTokenRecusarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projetos/$id_/compartilhar': {
+      id: '/projetos/$id_/compartilhar'
+      path: '/projetos/$id/compartilhar'
+      fullPath: '/projetos/$id/compartilhar'
+      preLoaderRoute: typeof ProjetosIdCompartilharRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/projetos/$id_/montagem': {
@@ -323,10 +403,14 @@ const rootRouteChildren: RootRouteChildren = {
   PerfilRoute: PerfilRoute,
   ClientesIdRoute: ClientesIdRoute,
   ClientesNovoRoute: ClientesNovoRoute,
+  PTokenRoute: PTokenRoute,
   ProjetosIdRoute: ProjetosIdRoute,
   ProjetosNovoRoute: ProjetosNovoRoute,
   ClientesIndexRoute: ClientesIndexRoute,
   ProjetosIndexRoute: ProjetosIndexRoute,
+  PTokenAlteracaoRoute: PTokenAlteracaoRoute,
+  PTokenRecusarRoute: PTokenRecusarRoute,
+  ProjetosIdCompartilharRoute: ProjetosIdCompartilharRoute,
   ProjetosIdMontagemRoute: ProjetosIdMontagemRoute,
   ProjetosIdVisibilidadeRoute: ProjetosIdVisibilidadeRoute,
   ProjetosIdContratoVersionRoute: ProjetosIdContratoVersionRoute,

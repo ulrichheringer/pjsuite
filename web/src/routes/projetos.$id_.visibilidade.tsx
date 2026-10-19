@@ -5,6 +5,7 @@ import {
   getClientView,
   getProject,
   getVisibility,
+  projectStatusLabels,
   saveVisibility,
   visibilityBlocks,
   visibilityLabels,
@@ -85,7 +86,7 @@ function VisibilityPage() {
             <h1>O cliente vê o que faz sentido.</h1>
             <p>Ligue ou desligue os blocos e confira a prévia ao lado.</p>
           </div>
-          <Badge>{project.status === "final" ? "Finalizado" : "Rascunho"}</Badge>
+          <Badge>{projectStatusLabels[project.status]}</Badge>
         </header>
         <Stepper id={id} current="visibilidade" />
         {problem && <Banner title={problem} tone="danger" />}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Download } from "lucide-react";
+import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
+import { ArrowRight, Download } from "lucide-react";
 import { getContract, type Contract } from "@/api";
 import { ContractPaper } from "@/contract-paper";
 import { Banner, Button, Loading } from "@/ui";
@@ -51,10 +51,18 @@ function ContractPdfPage() {
               {contract.content.client.name}
             </p>
           </div>
-          <Button variant="outline" onClick={() => window.print()}>
-            <Download />
-            Imprimir / salvar PDF
-          </Button>
+          <div className="row-between">
+            <Button variant="outline" onClick={() => window.print()}>
+              <Download />
+              Imprimir / salvar PDF
+            </Button>
+            <Button asChild>
+              <Link to="/projetos/$id/compartilhar" params={{ id }}>
+                Compartilhar
+                <ArrowRight />
+              </Link>
+            </Button>
+          </div>
         </header>
         <ContractPaper view={contract.content} version={contract.number} />
       </main>

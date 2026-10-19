@@ -69,5 +69,11 @@ func New(db *sql.DB, files storage.Store) *echo.Echo {
 	g.GET("/projects/:id/client-view", s.getClientView, s.requireAuth)
 	g.POST("/projects/:id/contract", s.writableProject(s.finalizeContract), s.requireAuth)
 	g.GET("/projects/:id/contract/:n", s.getContract, s.requireAuth)
+	g.POST("/projects/:id/share", s.writableProject(s.createShare), s.requireAuth)
+	g.POST("/projects/:id/share/regenerate", s.writableProject(s.regenerateShare), s.requireAuth)
+	g.GET("/projects/:id/share", s.getShare, s.requireAuth)
+	g.GET("/portal/:token", s.getPortal)
+	g.POST("/portal/:token/change", s.postChange, bodyLimit)
+	g.POST("/portal/:token/refuse", s.postRefuse, bodyLimit)
 	return e
 }

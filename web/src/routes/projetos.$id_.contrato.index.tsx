@@ -31,7 +31,7 @@ function ContractPage() {
         return navigate({ to: "/entrar" });
       }
       if (project.kind !== "ok" || preview.kind !== "ok") return setLoadFailed(true);
-      if (project.value.status === "final") {
+      if (project.value.status !== "draft") {
         return navigate({ to: "/projetos/$id/contrato/$version", params: { id, version: "1" } });
       }
       setView(preview.value);

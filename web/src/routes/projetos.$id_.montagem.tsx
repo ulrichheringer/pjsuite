@@ -6,6 +6,7 @@ import {
   deleteStage,
   getProject,
   listStages,
+  projectStatusLabels,
   reorderStages,
   saveBuilder,
   timingKindLabels,
@@ -196,7 +197,7 @@ function BuilderPage() {
             <h1>Montagem do projeto</h1>
             <p>Monte uma estrutura que acompanha o seu jeito de trabalhar.</p>
           </div>
-          <Badge>{project.status === "final" ? "Finalizado" : "Rascunho"}</Badge>
+          <Badge>{projectStatusLabels[project.status]}</Badge>
         </header>
         <Stepper id={id} current="montagem" />
         {problem && (

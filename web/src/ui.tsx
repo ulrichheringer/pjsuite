@@ -343,11 +343,13 @@ export function Timeline({
           <div>
             <strong>{s.split(" · ")[0]}</strong>
             <p>
-              {s.split(" · ")[1] || "Helena Duarte"}{" "}
-              <span>
-                · {i < 5 ? `${19 - i} nov` : `${27 - i} set`}, 2026 · 14:
-                {String(32 - i).padStart(2, "0")}
-              </span>
+              {s.split(" · ")[1] || (events ? "" : "Helena Duarte")}{" "}
+              {!events && (
+                <span>
+                  · {i < 5 ? `${19 - i} nov` : `${27 - i} set`}, 2026 · 14:
+                  {String(32 - i).padStart(2, "0")}
+                </span>
+              )}
             </p>
           </div>
         </li>
